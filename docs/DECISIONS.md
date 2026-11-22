@@ -131,7 +131,7 @@ Treating a park's centroid as its destination is wrong for large parks (Forest P
 
 - **Storage / API / web map:** EPSG:4326 (WGS 84 lon/lat). MapLibre reprojects to Web Mercator (EPSG:3857) for display.
 - **Analysis (distances, areas, buffers):** a projected CRS declared per region. Portland: **EPSG:26910 (NAD83 / UTM zone 10N, meters)**. Oregon State Plane North (EPSG:2913/2269) is in feet — avoided to keep units consistent across regions.
-- Never compute distances/areas in EPSG:4326 or EPSG:3857 (Web Mercator inflates areas ~1.9× at Portland's latitude).
+- Never compute distances/areas in EPSG:4326 or EPSG:3857 (Web Mercator inflates areas ≈2.0× at Portland’s latitude: 1/cos²(45.5°)).
 
 ---
 

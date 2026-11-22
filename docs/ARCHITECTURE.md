@@ -45,9 +45,9 @@ TouchGrass is a classic **batch-analysis + read-only serving** GIS system. The e
 | Component | Location (planned) | Responsibility | Must NOT |
 |---|---|---|---|
 | Region config | `config/regions/*.yaml` | Declare everything region-specific | Contain code |
-| Pipeline (`touchgrass` Python package) | `pipeline/` | Acquire → clean → load → analyze, one CLI | Know about the HTTP API |
-| Shared spatial core | `pipeline/touchgrass/core/` | CRS handling, snapping, Dijkstra, aggregation — region-agnostic | Reference any city by name |
-| Source adapters | `pipeline/touchgrass/sources/` | One adapter per data source type (TIGER, Census API, OSM parks, ArcGIS FeatureServer) | Contain analysis logic |
+| Pipeline (`touchgrass` Python package) | `pipeline/` (src layout: `pipeline/src/touchgrass/`) | Acquire → clean → load → analyze, one CLI | Know about the HTTP API |
+| Shared spatial core | `pipeline/src/touchgrass/core/` | CRS handling, snapping, Dijkstra, aggregation — region-agnostic | Reference any city by name |
+| Source adapters | `pipeline/src/touchgrass/sources/` | One adapter per data source type (TIGER, Census API, OSM parks, ArcGIS FeatureServer) | Contain analysis logic |
 | Database | `db/` (migrations, SQL) | Persist normalized data + results, enforce constraints | Hold raw downloads |
 | API | `api/` | Read-only queries, serialization, validation | Run heavy analysis |
 | Frontend | `web/` | Visualization, interaction, explanation | Compute metrics itself |

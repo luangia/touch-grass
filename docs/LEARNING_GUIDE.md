@@ -101,4 +101,4 @@ Each concept is taught with: **Intuition → Problem → Mechanics → Implement
 
 ## Lessons index
 
-Lessons are added to `docs/learning/` only when a stage is actually taught/implemented. None yet.
+- [Stage 1 — Foundations, environment & region config](learning/stage-01-foundations.md) (prepared)

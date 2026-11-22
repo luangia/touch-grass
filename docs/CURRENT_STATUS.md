@@ -6,15 +6,15 @@ _Last updated: 2026-11-22_
 
 | Item | Status |
 |---|---|
-| Phase | **Planning approved** — ready to prepare Stage 1 |
-| Current stage | None started. Next: **Stage 1 — Foundations, environment & region config** (preparation not started; implementation not yet approved) |
+| Phase | **Stage 1 prepared** — awaiting implementation approval |
+| Current stage | None started. Next: **Stage 1 — Foundations, environment & region config** (lesson written: docs/learning/stage-01-foundations.md; implementation not yet approved) |
 | Code | None |
 | Data downloaded | None |
 | Git | Not initialized (proposed for Stage 1, D-012) |
 
 ## Currently being worked on
 
-- Nothing in progress. Planning decisions D-001…D-012 accepted 2026-11-22.
+- Stage 1 preparation done. Waiting on three choices: container runtime (Docker not installed on this machine), CLI library (Typer vs argparse), optional CRS area-of-use check.
 
 ## Accepted decisions (summary)
 
@@ -22,7 +22,7 @@ See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 block
 
 ## Next steps
 
-1. `/learn:prepare-stage` — teach Stage 1 concepts and propose the exact implementation.
+1. You install a container runtime (or choose Postgres.app) and answer the Stage 1 choices.
 2. After your explicit approval: `/learn:implement-stage 1`.
 
 ## Blockers / risks being watched

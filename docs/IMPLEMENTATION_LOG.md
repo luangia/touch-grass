@@ -33,3 +33,13 @@ Chronological record of stages, changes, tests, and outcomes. Only work that act
 **Type:** Planning. The project owner approved all proposed decisions (D-001…D-012) as written. DECISIONS.md and CURRENT_STATUS.md updated. Stage 11 stays optional.
 
 **Not done:** Stage 1 not prepared or implemented (needs its own approval).
+
+---
+
+## 2026-11-22 — Stage 1 prepared (no code)
+
+**Type:** Teaching and preparation. Wrote `docs/learning/stage-01-foundations.md`. Checked the PyProj facts it uses in a throwaway environment, outside the project: EPSG 26910/4326/3857/2269 properties; the axis swap without `always_xy` returns `inf`; the Web Mercator area factor at 45.5°N is 2.04.
+
+**Found:** Docker is not installed on the dev machine (uv 0.10.2, Python 3.12.7, git, Node present).
+
+**Doc fixes:** D-008 area-inflation figure corrected (≈2.0×, previously "~1.9×"); ARCHITECTURE §2 paths updated to the `src/` layout.

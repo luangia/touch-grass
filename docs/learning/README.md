@@ -1,5 +1,7 @@
 # Lessons
 
-Detailed, stage-by-stage technical lessons. A lesson file is added here when its stage is prepared or implemented (e.g., `stage-01-foundations.md`).
+Detailed, stage-by-stage technical lessons.
 
-No lessons yet — the project is in planning.
+| Stage | Lesson | Status |
+|---|---|---|
+| 1 | [Foundations, environment & region config](stage-01-foundations.md) — vector vs raster, formats, CRS, PyProj, config validation, reproducible environments | Prepared, not implemented |
