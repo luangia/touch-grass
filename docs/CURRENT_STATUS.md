@@ -6,30 +6,24 @@ _Last updated: 2026-11-22_
 
 | Item | Status |
 |---|---|
-| Phase | **Planning complete — awaiting your feedback** |
-| Current stage | None started. Next: **Stage 1 — Foundations, environment & region config** (not approved yet) |
+| Phase | **Planning approved** — ready to prepare Stage 1 |
+| Current stage | None started. Next: **Stage 1 — Foundations, environment & region config** (preparation not started; implementation not yet approved) |
 | Code | None |
 | Data downloaded | None |
 | Git | Not initialized (proposed for Stage 1, D-012) |
 
 ## Currently being worked on
 
-- Reviewing the proposed plan and decisions with you.
+- Nothing in progress. Planning decisions D-001…D-012 accepted 2026-11-22.
 
-## Open decisions needing your approval
+## Accepted decisions (summary)
 
-See [DECISIONS.md](DECISIONS.md). Most important:
-1. **D-001** Study area: Portland city limits (+2 km analysis buffer).
-2. **D-003** Park source: OSM primary + validation vs Metro ORCA, *or* ORCA primary.
-3. **D-002** 2020 blocks for population weighting, ACS 2020–2024 block groups for demographics.
-4. **D-011** "Underserved" = > 10-minute (800 m) network walk to the nearest park access point.
-5. **D-009** Stack as proposed.
-6. Whether Stage 11 (deployment) is in scope for the 2-week window.
+See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack; git initialized in Stage 1. Stage 11 (deployment) stays optional, done only if time allows.
 
 ## Next steps
 
-1. You review / adjust decisions.
-2. On approval: `/learn:prepare-stage` for Stage 1, then `/learn:implement-stage 1`.
+1. `/learn:prepare-stage` — teach Stage 1 concepts and propose the exact implementation.
+2. After your explicit approval: `/learn:implement-stage 1`.
 
 ## Blockers / risks being watched
 

@@ -25,3 +25,11 @@ Chronological record of stages, changes, tests, and outcomes. Only work that act
 **Tests:** none (no code).
 
 **Outcome:** awaiting approval of proposed decisions before Stage 1.
+
+---
+
+## 2026-11-22 — Planning decisions approved
+
+**Type:** Planning. The project owner approved all proposed decisions (D-001…D-012) as written. DECISIONS.md and CURRENT_STATUS.md updated. Stage 11 stays optional.
+
+**Not done:** Stage 1 not prepared or implemented (needs its own approval).
