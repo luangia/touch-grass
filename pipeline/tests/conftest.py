@@ -21,6 +21,24 @@ _CHICAGO: dict[str, Any] = {
     "state_fips": "17",
     "county_fips": ["031"],
     "buffer_m": 2000,
+    # Illustrative endpoints: schema tests never contact them.
+    "study_boundary": {
+        "adapter": "arcgis_feature_layer",
+        "url": "https://gis.example.org/arcgis/rest/services/Boundaries/MapServer/0",
+        "where": "NAME = 'Chicago'",
+        "attribution": "Example City GIS",
+    },
+    "analysis_areas": [
+        {
+            "area_type": "community_area",
+            "adapter": "arcgis_feature_layer",
+            "url": "https://gis.example.org/arcgis/rest/services/Boundaries/FeatureServer/1",
+            "key_field": "AREA_NUM",
+            "name_field": "COMMUNITY",
+            "attribution": "Example City GIS",
+        }
+    ],
+    "census": {"decennial_vintage": 2020, "acs": {"year": 2024, "tables": ["B01003"]}},
 }
 
 

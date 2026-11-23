@@ -1,7 +1,7 @@
 # Region config: City of Portland, Oregon (DECISIONS.md D-001).
 # Everything Portland-specific lives here. Code reads it via touchgrass.config.
-# Data-source sections (boundary, neighborhoods, parks, population) are added in
-# Stages 2–3 together with the adapters that consume them.
+# Census (TIGER/ACS) URLs are derived in code from state_fips + vintages; only
+# city-published layers are listed here. Parks are added in Stage 3.
 
 region_id: portland-or
 name: Portland, Oregon
@@ -26,3 +26,44 @@ analysis:
   walk_speed_kmh: 4.8      # 80 m/min → 5/10/15 min ≈ 400/800/1200 m
   thresholds_min: [5, 10, 15]
   max_snap_m: 500
+
+# City limits. The layer holds all Metro-area cities; the server filters to Portland.
+study_boundary:
+  adapter: arcgis_feature_layer
+  url: https://www.portlandmaps.com/od/rest/services/COP_OpenData_Boundary/MapServer/10
+  where: "CITYNAME = 'Portland'"
+  attribution: Metro Data Resource Center (RLIS), via City of Portland Open Data
+
+analysis_areas:
+  # One polygon per neighborhood association; shared areas overlap (D-015 Q1).
+  # ID 0 = the four 'MC UNCLAIMED' areas, excluded (D-015 Q2).
+  - area_type: neighborhood
+    adapter: arcgis_feature_layer
+    url: https://www.portlandmaps.com/od/rest/services/COP_OpenData_Boundary/MapServer/125
+    where: "ID <> 0"
+    key_field: ID
+    name_field: NAME
+    allow_overlaps: true
+    attribution: City of Portland Bureau of Planning and Sustainability
+
+  # Built from 2020 census blocks; pop_total reconciles our block sums (D-015 Q3).
+  - area_type: council_district
+    adapter: arcgis_feature_layer
+    url: https://www.portlandmaps.com/od/rest/services/COP_OpenData_Boundary/MapServer/1413
+    key_field: DISTRICT
+    name_field: DISTRICT
+    allow_overlaps: false
+    population_check_field: pop_total
+    attribution: City of Portland City Elections Office
+
+census:
+  decennial_vintage: 2020
+  acs:
+    year: 2024 # ACS 5-year 2020–2024
+    # Total population; median household income; Hispanic/Latino origin by race;
+    # tenure by vehicles available (D-015 Q4).
+    tables: [B01003, B19013, B03002, B25044]
+
+validation:
+  expected_population: 652503 # 2020 Census, City of Portland (P.L. 94-171)
+  population_tolerance: 0.01

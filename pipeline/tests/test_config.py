@@ -65,6 +65,32 @@ class TestSchema:
             ({"analysis": {"thresholds_min": [5, 5]}}, "analysis.thresholds_min", "unique"),
             ({"analysis": {"walk_speed_kmh": -1}}, "analysis.walk_speed_kmh", "greater than 0"),
             ({"bufer_m": 100}, "bufer_m", "Extra inputs are not permitted"),  # typo
+            ({"study_boundary": {"adapter": "shapefile"}}, "study_boundary.adapter", "arcgis"),
+            (
+                {"study_boundary": {"adapter": "arcgis_feature_layer", "url": "http://x/1"}},
+                "study_boundary.url",
+                "pattern",
+            ),
+            (
+                {
+                    "census": {
+                        "decennial_vintage": 2010,
+                        "acs": {"year": 2024, "tables": ["B01003"]},
+                    }
+                },
+                "census.decennial_vintage",
+                "2020",
+            ),
+            (
+                {"census": {"decennial_vintage": 2020, "acs": {"year": 2024, "tables": ["X1"]}}},
+                "census.acs.tables",
+                "pattern",
+            ),
+            (
+                {"validation": {"population_tolerance": 0.5}},
+                "validation.population_tolerance",
+                "less than or equal",
+            ),
         ],
     )
     def test_rejects(
@@ -154,3 +180,9 @@ class TestLoader:
         config_dir = write_region(chicago_dict)
         monkeypatch.setenv(CONFIG_DIR_ENV, str(config_dir))
         assert find_config_dir(Path("/")) == config_dir.resolve()
+
+
+def test_duplicate_area_types_rejected(chicago_dict: dict[str, Any]) -> None:
+    chicago_dict["analysis_areas"] = chicago_dict["analysis_areas"] * 2
+    with pytest.raises(ValidationError, match="area_type values must be unique"):
+        RegionConfig.model_validate(chicago_dict)

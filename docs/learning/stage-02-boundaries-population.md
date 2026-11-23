@@ -1,6 +1,6 @@
 # Stage 2 — Boundaries & Population Data (Census / TIGER / City)
 
-> Status: **prepared, not implemented.** Code snippets show the planned approach; none exist yet.
+> Status: **implemented 2026-11-22** with decisions Q1–Q6 as recommended (D-015). §1–12 are the preparation lesson; §13 describes what was built and what the real data showed.
 > Facts marked **(verified 2026-11-22)** were checked against the live sources while preparing this lesson.
 
 ## 1. Objective and expected outcome
@@ -390,3 +390,158 @@ ACS files are **filtered while streaming**: only lines starting with `1500000US4
 - Esri ArcGIS REST API, Query (Feature Service / Map Service layer): https://developers.arcgis.com/rest/services-reference/enterprise/query-feature-service-layer/
 - City of Portland boundary services: https://www.portlandmaps.com/od/rest/services/COP_OpenData_Boundary/MapServer
 - GeoPandas spatial joins: https://geopandas.org/en/stable/docs/user_guide/mergingdata.html
+
+## 13. What was built (post-implementation)
+
+### Results on the real data
+
+| Check | Result |
+|---|---|
+| City population from blocks | **652,503**: exactly the official 2020 total |
+| Council districts (4) | Every district reconciles **exactly** with the city's `pop_total` |
+| Blocks in the study area | 12,357 (10,372 populated, 1,985 empty), from 29,644 county blocks |
+| Census interior points outside their own block | 0 (no fallbacks needed) |
+| Neighborhood membership | 0 areas: 161 blocks / **680 people** (unclaimed areas). 1 area: 11,963 / 637,121. 2+ areas: 233 / **14,702** (shared areas) |
+| Σ neighborhood populations | 666,525 = 652,503 − 680 + 14,702: **why city totals come from blocks** |
+| Our UTM block area ÷ Census ALAND+AWATER | **0.99922**: exactly UTM 10N's areal scale factor at Portland from the [CRS deep dive](deep-dive-crs.md) |
+| Privacy-noise signals | 178 blocks with people but 0 housing units (5,940 people) |
+| ACS median income (B19013) | Median CV 0.22; 12.6% of block groups have CV > 40%; 25 block groups have no estimate |
+| Idempotency | Second `process` run: **byte-identical** Parquet |
+| Runtime | `fetch` 9.4 s (first run), `process` ~14 s |
+
+Two of these deserve a second look:
+
+1. **The area ratio is the CRS lesson made concrete.** We never told the code about scale factors. Measuring 12,357 blocks in UTM and comparing with the Census's own areas gives 0.99922: the −0.078% areal distortion predicted from k₀ = 0.9996. An independent dataset confirmed our projection maths.
+2. **The exact council-district match validates the method, not just the totals.** Districts were drawn from 2020 blocks. If our interior-point assignment put even one populated block in the wrong district, a difference would appear. None did.
+
+### Differences from the plan
+- **Boundary diagnostics were reworded after seeing the data.** The first version reported "328 straddling blocks, 20,914 people excluded", which sounded alarming. Measuring overlap showed that 194 of them overlap the city by < 1% (digitising slivers where Metro's boundary and the Census lines trace the same street slightly differently), 108 by 1–10%, and only 26 (401 people) by ≥ 10%. The stat is now a breakdown by overlap fraction.
+- **One API slip.** I called `GeoSeries.point_on_surface()`. GeoPandas names the GEOS operation `representative_point()`. The real-data run caught it immediately. The fallback path is now also covered by a unit test (a C-shaped polygon).
+- **Membership uses `intersects`, not `within`**, so a point exactly on a shared edge is counted in both areas (and flagged for non-overlapping types) instead of silently vanishing.
+
+### Data flow, end to end
+
+```
+fetch  ─┬─ arcgis.fetch_layer ×3   GET layer?f=json → count → paged query (outSR=4326) → .geojson + manifest
+        ├─ http.download ×2        TIGER zips streamed → SHA-256 → atomic rename → manifest
+        └─ http.download ×4        ACS .dat streamed (175 MB) → keep header + 1500000US41{051,067,005} lines
+
+process (offline; every raw file re-verified against its manifest checksum)
+  boundary  geojson → make_valid → union → MultiPolygon ; buffer 2 km in EPSG:26910 → back to 4326
+  areas     per area_type → standard columns (area_id = "<type>:<key>") → dissolve by key
+  blocks    pyogrio WHERE COUNTYFP20 IN (...) → INTPT points (built in NAD83) → reproject
+            → prepared point-in-polygon against boundary → keep 12,357
+  members   sjoin(points, areas, intersects) → (area_id, area_type, geoid20)
+  bgs       TIGER BG ⋈ ACS on GEOID (attribute join; blocks nest by GEOID[:12])
+  validate  16 hard + 15 soft checks → validation.json ; exit 1 on any hard failure
+```
+
+### Known limitations
+- **Block populations are 2020 counts** with privacy noise; growth since 2020 is invisible (D-002).
+- **Metro RLIS licence** for the City Boundaries layer still needs a manual read (its page needs JavaScript).
+- **ACS estimates are attached to block groups but not yet aggregated** to neighborhoods. MOE propagation happens in Stage 7.
+- **The interior-point rule assigns each block wholly to one side** of a boundary. That's fine at Portland's scale (≥ 10%-overlap exclusions total 401 people, 0.06%), but a city whose official boundary cut through many populated blocks would need area-weighted allocation.
+- **The statewide TIGER zip (287 MB) is re-read on every `process`.** GDAL filters while reading, so memory stays small, but a future optimisation could cache the county subset.
+
+### Exercises
+1. **Practical.** Using only the processed files, find the 5 neighborhoods with the largest *share* of residents who live in shared (2+) areas. Then explain how a "% within 10 minutes" metric could mislead if those shared areas happen to be near parks.
+2. **Break it on purpose.** Remove `where: "ID <> 0"` from the config and rerun `process`. Predict the new neighborhood count and how the "0 areas" population changes, then check `validation.json`. Restore it afterwards.
+3. **Scenario.** A colleague averages `b19013_e001` (median household income) across a neighborhood's block groups and reports it as the neighborhood's median income. Give two separate reasons this is wrong.
+4. **Explain in your own words:** why block → block group is a string slice but block → neighborhood is a spatial join; what the `source_sha256` in an ACS manifest proves; why the area ratio came out at exactly 0.99922.
+
+## 14. Answers
+
+> Numbers below were computed from the real processed Portland outputs on 2026-11-22. Exercise 2 was run on a **temporary copy** of the config and data, so the real config and outputs were not changed.
+
+### Questions from §12
+
+**1. Why is block → block group an attribute join, but block → neighborhood a spatial join?**
+
+Because one relationship is *defined by the Census* and the other is not.
+- Census geography is a strict hierarchy, and the Census Bureau encodes it in the IDs. A block's 15-digit GEOID literally *contains* its block group's 12-digit GEOID (`410510001011` + `011`). Membership is a fact stored in the identifier, so a string slice `geoid20[:12]` is exact. It can't suffer from sliver overlaps, digitising differences or boundary-touching ambiguity.
+- Neighborhood associations are civic boundaries drawn by the City, independently of census geography. No block ID mentions a neighborhood, and blocks don't nest inside neighborhoods. Membership can only be discovered by comparing geometry: here, whether the block's interior point lies inside the neighborhood polygon.
+- **Rule of thumb:** use an attribute join whenever the data publisher guarantees the relationship. A spatial join is a measurement, and measurements need tolerance rules, tie-breaking and validation.
+
+**2. Why can't the city's population be the sum of its neighborhoods?**
+
+Because neighborhoods are neither *exhaustive* nor *exclusive*:
+- **Overlaps (double counting):** shared areas belong to two neighborhoods. 233 blocks, **14,702 people**, are counted twice.
+- **Gaps (missed people):** some city land is in no neighborhood. 161 blocks, **680 people**, are counted zero times.
+- Result: Σ neighborhoods = 652,503 − 680 + 14,702 = **666,525**, about 2.1% too high.
+
+A sum only equals the total when the parts **partition** the whole: every unit in exactly one part. Council districts do partition the city, which is why their sum matched exactly. So city-wide figures are always computed from blocks, never by adding up areas (D-007).
+
+**3. If a block straddles the city boundary, what decides whether its residents count as Portlanders, and what's the bias?**
+
+- **What decides it:** the block's representative point, the Census internal point (`INTPTLON20`/`INTPTLAT20`). If that point is inside the city polygon, *all* of the block's residents count; if not, *none* do. A block is never split.
+- **The bias:** the point is a *geometric* location, not a population-weighted one. People could live mainly in the part of the block on the other side of the line. So the rule can wrongly include or exclude whole blocks of people. There's no systematic direction (it can go either way), which makes it noise rather than drift, but it's real.
+- **How big it is here (measured):**
+  - Of 328 blocks touching the boundary but counted as outside, 194 overlap the city by < 1% (digitising slivers). Only **26 blocks / 401 people (0.06%)** overlap by ≥ 10%.
+  - **0 included blocks** have less than half their area inside the city.
+  - The independent check: the city total came out at exactly 652,503, and all 4 council districts matched exactly. Census blocks were drawn to respect legal city limits as of 2020, so for Portland the rule loses essentially nothing.
+- **Where it would matter:** a city that annexed a lot of land after 2020, or a study boundary that isn't a legal boundary (a custom planning area). Those cut through populated blocks, so area- or housing-weighted allocation would be needed.
+
+**4. What would one `-666666666` slipping through as a number do to a neighborhood's average median income?**
+
+It would destroy it. Measured on **Centennial** (24 block groups, 3 of which have no published median income):
+
+| Calculation | Result |
+|---|---|
+| Mean of the 21 real values | **$68,090** |
+| Mean with the 3 sentinels read as numbers | **−$83,273,755** |
+| Median with the sentinels read as numbers | $60,218 (true median of real values: $66,882) |
+
+- The mean is dominated by the sentinels: 3 × −666,666,666 ÷ 24 ≈ −$83M.
+- The median doesn't explode, but it **silently shifts down by about $6,700**, which is plausible-looking and therefore more dangerous. Nobody would notice −$83M passing a review, but $60k could easily get through.
+
+That's why `acs.read_table` turns sentinels into nulls *at the boundary* and refuses any other negative value outright.
+
+### Exercises from §13
+
+**Exercise 1: neighborhoods with the largest share of residents in shared areas**
+
+| Neighborhood | Residents | In shared areas | Share | Shares with |
+|---|---|---|---|---|
+| Healy Heights | 183 | 183 | **100.0%** | Southwest Hills |
+| Linnton | 958 | 491 | 51.3% | Forest Park |
+| Hillside | 2,355 | 926 | 39.3% | |
+| Sylvan-Highlands | 1,218 | 463 | 38.0% | |
+| Ardenwald-Johnson Creek | 899 | 341 | 37.9% | |
+
+(32 of 93 neighborhoods have some shared residents.)
+
+How a "% within 10 minutes" metric could mislead:
+- **Small neighborhoods are dominated by shared blocks.** Healy Heights' entire population is also Southwest Hills' population. Whatever access those 183 people have, both neighborhoods report it. Healy Heights has no independent signal.
+- **If shared areas are near parks, their good access is counted twice.** For example, Linnton shares 491 residents with **Forest Park**, the city's largest natural area. Those residents' presumably good access lifts both neighborhoods. A ranking would place both higher than their "own" residents justify, and a city-wide figure computed by averaging neighborhoods would be biased upward. (Our city-wide figure comes from blocks, so it's immune.)
+- **The reverse also holds:** a shared area far from parks drags both neighborhoods down.
+- **What we'll do in Stage 7:** report each neighborhood's shared-population share next to its access metric, and always compute city totals from blocks.
+
+**Exercise 2: removing `where: "ID <> 0"` (run on a temporary copy)**
+
+| | With filter (real) | Without filter |
+|---|---|---|
+| Source features | 93 | 97 |
+| Neighborhood areas | **93** | **94** (not 97!) |
+| Blocks / people in 0 neighborhoods | 161 / **680** | 104 / **212** (not 0!) |
+| Hard checks | all pass | all pass |
+
+Both predictions most people make are wrong, and both teach something:
+- **94, not 97:** all four `MC UNCLAIMED` features share `ID = 0`, so the pipeline's dissolve-by-key merged them into **one** area (`duplicate_source_keys_dissolved: 3`). It took the label "MC UNCLAIMED #5" from the first feature, a misleading name for four separate places. This shows why `key_field` must really be unique (and why `ID` was a safe key only *after* excluding the zeros).
+- **212, not 0:** the unclaimed polygons only absorbed 468 people. The other 212 live in city land covered by **no** neighborhood polygon at all. 209 of them are more than 50 m from the nearest neighborhood (up to 2 km), so these are genuine gaps in the City's map, not slivers.
+- **Why nothing failed:** neighborhoods are `allow_overlaps: true` and have no population check, so this is reported (soft) rather than enforced (hard). A judgement call that is visible in `validation.json`, not hidden.
+
+**Exercise 3: averaging block-group median incomes**
+
+Two independent reasons it's wrong (any one is enough):
+1. **The mean of medians is not a median.** A median is a property of the whole distribution of households. You can't rebuild a neighborhood's median from its parts' medians. You'd need the full income distribution (ACS table B19001, households by income bracket) and an interpolated median.
+2. **It's unweighted.** A block group with 150 households counts as much as one with 1,500. Even a sensible average would need household weights.
+
+Further problems:
+- **Partial overlap:** block groups don't nest in neighborhoods, so some contribute households that live outside the neighborhood.
+- **Missing values:** 3 of Centennial's 24 block groups have no estimate. Dropping them silently changes who is represented, and keeping them as numbers is catastrophic (question 4).
+- **Uncertainty is ignored:** each estimate carries an MOE (median CV 0.22), and the averaged figure would be reported with false precision.
+
+**Exercise 4: explanations**
+- **String slice vs spatial join:** see question 1. The block group is *encoded in* the block's ID; the neighborhood isn't, so it has to be measured geometrically.
+- **What `source_sha256` proves:** it is the SHA-256 of the *complete* nationwide file as it arrived from the Census Bureau, before we kept only our block groups. Anyone can download the same URL, hash it, and confirm they got byte-identical input. Then, by re-applying the recorded `filter`, they can reproduce our stored file, whose own hash is `stored_sha256`. Together, the two hashes prove *what* the source was and *what we did to it*. A single hash of our filtered file couldn't prove we hadn't edited it.
+- **Why the area ratio was exactly 0.99922:** we measured block areas in UTM zone 10N. UTM deliberately scales the central meridian by k₀ = 0.9996 to spread its error, and area scales with k². At Portland, k ≈ 0.99961, so k² ≈ 0.99922. The Census's ALAND/AWATER are true ground areas. So our total ÷ theirs is just UTM's areal scale factor: about 0.08% of shrinkage, matching the CRS deep dive exactly. It's also an *independent* confirmation that our reprojection and area code are correct.

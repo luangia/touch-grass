@@ -5,7 +5,12 @@ Stage 1 commands:
   touchgrass regions validate <region-id | path.yaml> [...]
   touchgrass regions show <region-id | path.yaml>
 
-Later stages add command groups (fetch, load, analyze) to the same ``app``.
+Stage 2 commands:
+  touchgrass fetch <region-id> [--refresh]     download raw inputs (network)
+  touchgrass process <region-id>               raw → GeoParquet + validation (offline)
+  touchgrass validate <region-id>              re-check existing processed outputs
+
+Later stages add commands (load, analyze) to the same ``app``.
 """
 
 from __future__ import annotations
@@ -17,6 +22,10 @@ import typer
 
 from touchgrass import __version__
 from touchgrass.config import ConfigError, RegionConfig, find_config_dir, list_regions, load_region
+from touchgrass.paths import RegionPaths, resolve_data_dir
+from touchgrass.pipeline.fetch import run_fetch
+from touchgrass.pipeline.process import MissingDataError, load_outputs, load_stats, run_process
+from touchgrass.pipeline.validate import Check, failed, run_validation, write_report
 
 app = typer.Typer(
     help="TouchGrass geospatial pipeline.", no_args_is_help=True, add_completion=False
@@ -110,3 +119,96 @@ def regions_show(
         _print_errors(err)
         raise typer.Exit(code=1) from err
     typer.echo(cfg.model_dump_json(indent=2))
+
+
+# --------------------------------------------------------------------- Stage 2: data
+
+DataDirOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--data-dir",
+        help="Data directory (default: $TOUCHGRASS_DATA_DIR or <repo>/data).",
+        file_okay=False,
+    ),
+]
+
+
+def _region_and_paths(
+    region: str, config_dir: Path | None, data_dir: Path | None
+) -> tuple[RegionConfig, RegionPaths]:
+    try:
+        directory = config_dir or find_config_dir()
+        cfg = load_region(region, directory)
+    except ConfigError as err:
+        _print_errors(err)
+        raise typer.Exit(code=1) from err
+    return cfg, RegionPaths(cfg.region_id, resolve_data_dir(directory, data_dir))
+
+
+def _report(cfg: RegionConfig, checks: list[Check], out_dir: Path) -> None:
+    path = write_report(cfg, checks, out_dir)
+    for c in checks:
+        if c.severity == "hard":
+            mark, color = ("✓", "green") if c.passed else ("✗", "red")
+            line = f"{mark} {c.name}"
+            if not c.passed:
+                line += f"  expected={c.expected} actual={c.actual} {c.details or ''}"
+            typer.secho(line, fg=color)
+        elif c.name != "process.stats":
+            typer.echo(f"• {c.name}: {c.actual}")
+    bad = failed(checks)
+    summary = f"{len(bad)} hard check(s) failed" if bad else "all hard checks passed"
+    typer.secho(f"\n{summary}; report: {path}", fg="red" if bad else "green")
+    if bad:
+        raise typer.Exit(code=1)
+
+
+@app.command("fetch")
+def fetch_cmd(
+    region: Annotated[str, typer.Argument(help="Region id.")],
+    refresh: Annotated[bool, typer.Option("--refresh", help="Re-download cached files.")] = False,
+    config_dir: ConfigDirOption = None,
+    data_dir: DataDirOption = None,
+) -> None:
+    """Download every raw input for a region, with checksums and manifests."""
+    cfg, paths = _region_and_paths(region, config_dir, data_dir)
+    results = run_fetch(cfg, paths, refresh=refresh, progress=typer.echo)
+    downloaded = sum(r.downloaded for r in results)
+    typer.secho(
+        f"\n{len(results)} sources ({downloaded} downloaded, {len(results) - downloaded} cached)"
+        f" in {paths.raw}",
+        fg="green",
+    )
+
+
+@app.command("process")
+def process_cmd(
+    region: Annotated[str, typer.Argument(help="Region id.")],
+    config_dir: ConfigDirOption = None,
+    data_dir: DataDirOption = None,
+) -> None:
+    """Build clean GeoParquet outputs from raw files (offline), then validate them."""
+    cfg, paths = _region_and_paths(region, config_dir, data_dir)
+    try:
+        result = run_process(cfg, paths, progress=lambda m: typer.echo(f"→ {m}"))
+    except MissingDataError as err:
+        typer.secho(f"✗ {err}", fg="red", err=True)
+        raise typer.Exit(code=1) from err
+    typer.echo(f"wrote {len(result.frames)} files to {paths.processed}\n")
+    _report(cfg, run_validation(cfg, result.frames, result.stats), paths.processed)
+
+
+@app.command("validate")
+def validate_cmd(
+    region: Annotated[str, typer.Argument(help="Region id.")],
+    config_dir: ConfigDirOption = None,
+    data_dir: DataDirOption = None,
+) -> None:
+    """Re-run validation on existing processed outputs."""
+    cfg, paths = _region_and_paths(region, config_dir, data_dir)
+    try:
+        frames = load_outputs(paths.processed)
+    except MissingDataError as err:
+        typer.secho(f"✗ {err}", fg="red", err=True)
+        raise typer.Exit(code=1) from err
+    _report(cfg, run_validation(cfg, frames, load_stats(paths.processed)), paths.processed)

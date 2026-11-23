@@ -6,34 +6,38 @@ _Last updated: 2026-11-22_
 
 | Item | Status |
 |---|---|
-| Phase | **Stage 1 complete. Stage 2 prepared**, awaiting implementation approval |
-| Completed stages | 1: Foundations, environment & region config (2026-11-22) |
-| Next stage | 2: Boundaries & population data. Lesson: [stage-02-boundaries-population.md](learning/stage-02-boundaries-population.md). **Not approved for implementation** |
-| Code | `pipeline/` package: CRS rules, region config schema/loader, CLI; 55 tests |
-| Database | PostGIS 3.6.4 via `docker compose` (no tables yet; not needed until Stage 4) |
-| Data downloaded | None (Stage 2 will download ≈ 480 MB, git-ignored) |
-| Git | `main`, in sync with `origin` |
+| Phase | **Stage 2 implemented**, awaiting your review |
+| Completed stages | 1: Foundations (2026-11-22) |
+| In review | 2: Boundaries & population data. All hard checks pass on real data (see IMPLEMENTATION_LOG) |
+| Next stage | 3: Parks & green space. **Not started; needs your approval** |
+| Code | `pipeline/`: config, CRS rules, source adapters, spatial core, fetch/process/validate CLI; 92 tests |
+| Data | `data/raw/portland-or` (313 MB) and `data/processed/portland-or` (5 GeoParquet files + `validation.json`, 3.4 MB); git-ignored |
+| Database | PostGIS running, no tables yet (Stage 4) |
+| Git | Stage 2 changes **uncommitted** |
 
 ## Currently being worked on
 
-- Stage 2 preparation done. Waiting on decisions Q1–Q6 in the Stage 2 lesson §9, and your approval to implement.
+- Nothing in progress. Stage 2 is waiting on your review.
 
 ## Accepted decisions (summary)
 
-See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff).
+See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff). Stage 2 added D-015 (data-source choices) and amended D-007 (Census interior points).
 
 ## How to run what exists
 
 ```bash
-docker compose up -d db                      # from the repo root
-cd pipeline && uv run touchgrass regions validate portland-or
-uv run pytest
+cd pipeline
+uv run touchgrass fetch portland-or      # ~480 MB streamed once, then cached
+uv run touchgrass process portland-or    # offline; writes data/processed/portland-or/
+uv run pytest                            # add -m data for real-data checks only
 ```
 
 ## Next steps
 
-1. Answer Stage 2 decisions Q1–Q6 (neighborhood layer, unclaimed areas, council districts, ACS tables, bulk files vs API key, representative point).
-2. Approve implementation: `/learn:implement-stage 2`.
+1. Review Stage 2 (`data/processed/portland-or/validation.json` is the best place to start).
+2. Decide on committing.
+3. Manually confirm the Metro RLIS licence terms for the City Boundaries layer.
+4. When ready: `/learn:advance` to prepare Stage 3.
 
 ## Blockers / risks being watched
 
@@ -59,4 +63,5 @@ Target bullets (pending implementation):
 
 Completed so far:
 - Project planning and architecture design.
+- Stage 2: reproducible Census/TIGER/ArcGIS ETL; population reconciles exactly to the official 2020 total (652,503) and to all 4 council districts; overlapping-neighborhood membership model; 92 tests.
 - Stage 1: config-driven region model with validated CRS rules (projected, metric, non-Mercator, area-of-use check), a Typer CLI, a 55-test suite, and a containerised PostGIS environment. *Foundation only, not yet resume-worthy on its own.*

@@ -5,7 +5,7 @@ Detailed, stage-by-stage technical lessons.
 | Stage | Lesson | Status |
 |---|---|---|
 | 1 | [Foundations, environment & region config](stage-01-foundations.md) — vector vs raster, formats, CRS, PyProj, config validation, reproducible environments | Implemented (2026-11-22) |
-| 2 | [Boundaries & population data](stage-02-boundaries-population.md) — census geography and GEOIDs, decennial vs ACS, MOE, differential privacy, TIGER, ArcGIS REST, GeoPandas internals, spatial joins, reproducible ETL | Prepared, not implemented |
+| 2 | [Boundaries & population data](stage-02-boundaries-population.md) — census geography and GEOIDs, decennial vs ACS, MOE, differential privacy, TIGER, ArcGIS REST, GeoPandas internals, spatial joins, reproducible ETL | Implemented (2026-11-22) |
 
 ## Deep dives
 

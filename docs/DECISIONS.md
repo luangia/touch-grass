@@ -119,7 +119,7 @@ Treating a park's centroid as its destination is wrong for large parks (Forest P
 
 **Status:** Accepted (2026-11-22)
 
-- **Block → study area / analysis area:** block's *representative point* (`ST_PointOnSurface`, guaranteed inside the polygon unlike a centroid) is within the polygon.
+- **Block → study area / analysis area:** block's *representative point* is within the polygon. *Amended 2026-11-22 (D-015 Q6):* the representative point is the Census internal point (`INTPTLON20`/`INTPTLAT20`). It's checked to lie inside its block, with GEOS `point_on_surface` as a fallback. Either way the point is guaranteed inside the polygon, unlike a centroid.
 - **Overlapping neighborhoods:** Portland neighborhood boundaries include shared/overlapping areas. A many-to-many `area_membership` table lets a block belong to more than one neighborhood; overlaps are counted in each, and city-wide totals are computed from blocks directly (never by summing neighborhoods).
 - **ACS block group → block:** blocks nest inside block groups by GEOID prefix (first 12 digits), so this is an attribute join, not a spatial one.
 
@@ -205,3 +205,20 @@ The project owner initialised the repository (remote `origin`, branch `main`) be
 **Decision.** `[tool.uv] exclude-newer` in `pipeline/pyproject.toml` (currently `2026-11-08`) means uv ignores any package published after that date. Exact versions and hashes are pinned in `uv.lock`. When upgrading, bump the date deliberately and keep it at least two weeks in the past.
 
 **Consequence.** We run slightly older patch releases (e.g., pydantic 2.14.3 rather than 2.14.4). The lower bounds in `pyproject.toml` only state the oldest API we rely on.
+
+---
+
+## D-015 — Stage 2 data-source choices
+
+**Status:** Accepted (2026-11-22, "Approve as recommended")
+
+Context and evidence: `docs/learning/stage-02-boundaries-population.md` §4 and §9.
+
+| # | Decision |
+|---|---|
+| Q1 | Neighborhoods come from City of Portland layer 125 "Neighborhoods (regions)": one polygon per neighborhood, overlapping in shared areas, so blocks can belong to two neighborhoods (`area_membership`) |
+| Q2 | The 4 `MC UNCLAIMED` areas (`ID = 0`) are excluded via the config `where` clause. Their residents still count city-wide and are reported as "no neighborhood association" |
+| Q3 | City Council districts (layer 1413) are a second `area_type`. Their `pop_total` is an exact reconciliation check |
+| Q4 | ACS 2020–2024 tables: B01003, B19013, B03002, B25044. Age (B01001, 191 MB) deferred |
+| Q5 | Census data from key-free bulk files (TIGER/Line, ACS table-based summary file), not the Census API (which now requires a key) |
+| Q6 | Block representative point = Census internal point, checked inside its polygon (amends D-007) |

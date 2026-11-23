@@ -21,10 +21,10 @@ Each concept is taught with: **Intuition → Problem → Mechanics → Implement
 | Geospatial formats (GeoJSON, Shapefile, GeoPackage, GeoParquet, MVT) | 1, 8 | Pick a format and defend it; explain RFC 7946 lon/lat order | ◐ |
 | Coordinate reference systems, EPSG codes, datums | 1 | Read a CRS definition; explain NAD83 vs WGS 84 | ◐ |
 | Geographic vs projected coordinates | 1, 3 | Explain why `area` in degrees is meaningless; why Web Mercator distorts area | ◐ |
-| Geometry validity (OGC Simple Features) | 2, 3 | Diagnose and repair a self-intersecting polygon | ☐ |
-| Spatial joins (point-in-polygon, intersects, nearest) | 2, 4 | Write the same join in GeoPandas and PostGIS | ☐ |
-| Spatial intersection / overlay | 3 | Measure overlap between two park datasets | ☐ |
-| Buffers and edge effects | 2, 6 | Explain why the study area is buffered; why buffers ≠ walk sheds | ☐ |
+| Geometry validity (OGC Simple Features) | 2, 3 | Diagnose and repair a self-intersecting polygon | ◐ |
+| Spatial joins (point-in-polygon, intersects, nearest) | 2, 4 | Write the same join in GeoPandas and PostGIS | ◐ |
+| Spatial intersection / overlay | 3 | Measure overlap between two park datasets | ◐ |
+| Buffers and edge effects | 2, 6 | Explain why the study area is buffered; why buffers ≠ walk sheds | ◐ |
 | Spatial indexing (R-tree, KD-tree) | 4, 5 | Explain filter-and-refine; when an index won't help | ☐ |
 
 ## 2. Spatial analysis
@@ -39,7 +39,7 @@ Each concept is taught with: **Intuition → Problem → Mechanics → Implement
 | Spatial aggregation | 7 | Aggregate block results to neighborhoods with overlaps | ☐ |
 | Population-weighted metrics | 7 | Show numerically how weighting changes a ranking | ☐ |
 | MAUP & ecological fallacy | 7 | Explain why results depend on boundaries and what you can't infer about individuals | ☐ |
-| Uncertainty (ACS margins of error) | 7 | Decide whether two estimates are meaningfully different | ☐ |
+| Uncertainty (ACS margins of error) | 7 | Decide whether two estimates are meaningfully different | ◐ |
 
 ## 3. Spatial databases
 
@@ -57,12 +57,12 @@ Each concept is taught with: **Intuition → Problem → Mechanics → Implement
 
 | Concept | Stage | You should be able to… | Status |
 |---|---|---|---|
-| Data acquisition (APIs, FeatureServers, bulk files) | 2, 3 | Write an adapter with provenance and checksums | ☐ |
-| ETL pipeline design (raw → processed → loaded) | 2–4 | Explain idempotency and immutable raw data | ☐ |
+| Data acquisition (APIs, FeatureServers, bulk files) | 2, 3 | Write an adapter with provenance and checksums | ◐ |
+| ETL pipeline design (raw → processed → loaded) | 2–4 | Explain idempotency and immutable raw data | ◐ |
 | Data cleaning & classification rules | 3 | Justify each park inclusion/exclusion rule | ☐ |
 | Coordinate transformations in practice (PyProj) | 1–3 | Transform safely; know `always_xy` | ◐ |
-| Reproducibility (manifests, pinned deps, run records) | 2, 6 | Re-run and get identical results | ☐ |
-| Data validation (invariants, reconciliation) | all | Write checks that catch silent spatial bugs | ☐ |
+| Reproducibility (manifests, pinned deps, run records) | 2, 6 | Re-run and get identical results | ◐ |
+| Data validation (invariants, reconciliation) | all | Write checks that catch silent spatial bugs | ◐ |
 | Configuration-driven multi-region design | 1, 2 | Explain how a new city is onboarded | ◐ |
 
 ## 5. Web GIS
@@ -102,5 +102,5 @@ Each concept is taught with: **Intuition → Problem → Mechanics → Implement
 ## Lessons index
 
 - [Stage 1 — Foundations, environment & region config](learning/stage-01-foundations.md) (implemented)
-- [Stage 2 — Boundaries & population data](learning/stage-02-boundaries-population.md) (prepared)
+- [Stage 2 — Boundaries & population data](learning/stage-02-boundaries-population.md) (implemented)
 - [Deep dive: Coordinate Reference Systems](learning/deep-dive-crs.md)

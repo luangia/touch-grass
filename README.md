@@ -2,7 +2,7 @@
 
 **How far is nature, really?** TouchGrass measures how easily residents can *walk* to parks and natural areas, neighborhood by neighborhood — starting with Portland, Oregon, and designed to support more cities through configuration.
 
-> **Status: Stage 1 of 11 implemented** (project skeleton, region config, CRS rules, local PostGIS). No data or analysis yet. See [docs/CURRENT_STATUS.md](docs/CURRENT_STATUS.md).
+> **Status: Stage 2 of 11 implemented**: region config, CRS rules, and a reproducible Census/TIGER/City data pipeline. No parks or walking analysis yet. See [docs/CURRENT_STATUS.md](docs/CURRENT_STATUS.md).
 
 ## Quickstart (what works today)
 
@@ -14,6 +14,8 @@ docker compose up -d db       # PostgreSQL 17 + PostGIS 3.6
 cd pipeline
 uv sync                       # installs the exact versions in uv.lock
 uv run touchgrass regions validate portland-or
+uv run touchgrass fetch portland-or     # downloads ~480 MB once (cached afterwards)
+uv run touchgrass process portland-or   # offline: GeoParquet + validation report
 uv run pytest
 ```
 

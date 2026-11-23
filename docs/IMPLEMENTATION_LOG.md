@@ -101,3 +101,42 @@ Wrote `docs/learning/deep-dive-crs.md`. All numbers came from experiments run in
 - The City layer metadata page timed out, so licence wording is still to be verified during Stage 2.
 
 **Created:** `docs/learning/stage-02-boundaries-population.md` (decisions Q1–Q6 pending).
+
+---
+
+## 2026-11-22 — Stage 2 implemented: Boundaries & population data
+
+**Approved by:** project owner ("Approve as recommended": D-015 Q1–Q6).
+
+**Built**
+- Dependencies (under the D-014 cutoff): geopandas 1.2.0, pyogrio 0.13.0 (GDAL 3.12.4), shapely 2.2.0 (GEOS 3.14.1), pyarrow 26.0.1, httpx 0.28.1, pandas 3.1.1. mypy treats the untyped geo libraries as `Any`.
+- Config schema: `study_boundary` and `analysis_areas` (typed ArcGIS sources; unique `area_type`), `census` (decennial vintage, ACS year and tables), `validation` (expected population, tolerance). `portland-or.yaml` filled in (layers 10, 125 with `ID <> 0`, 1413).
+- `touchgrass.paths`: raw/processed layout; `--data-dir` / `TOUCHGRASS_DATA_DIR`.
+- `sources/http.py`: streaming download, atomic write, SHA-256 + manifest, cache with checksum check, optional line filter (records the full-source checksum *and* the filter).
+- `sources/arcgis.py`: paged `/query` with stable `orderByFields`, `outSR=4326`, GeoJSON; total cross-checked with `returnCountOnly`; publisher copyright/description stored in the manifest.
+- `sources/tiger.py` (derived URLs; GDAL `where` county filter while reading) and `sources/acs.py` (prefix-filtered streaming; sentinels → null; unexpected negatives raise).
+- `core/geometry.py` (`to_multipolygon`/`clean_polygons`, `buffer_in_crs`, `area_m2`, `representative_points` with fallback) and `core/assign.py` (prepared point-in-polygon; many-to-many `sjoin` with `intersects`).
+- `pipeline/fetch.py`, `process.py`, `validate.py`; CLI `fetch`, `process`, `validate`.
+
+**Real-data results (Portland)**
+- `fetch`: 9 sources, 313 MB stored (ACS streamed ~175 MB, stored 0.4 MB after filtering), 9.4 s. Second run: 0 downloaded, 9 cached.
+- `process`: about 14 s; 16/16 hard checks passed.
+  - **City population from blocks = 652,503, exactly the official 2020 total** (relative difference 0).
+  - **All 4 council districts reconcile exactly** (159,498 / 160,716 / 167,642 / 164,647).
+  - 12,357 blocks (10,372 populated); 0 interior-point fallbacks; 533 block groups, all with ACS data (25 null median incomes).
+  - 93 neighborhoods: 161 blocks / 680 people in none (unclaimed areas); 233 blocks / 14,702 people in two. The neighborhood sum is 666,525, which ≠ 652,503, as predicted.
+  - UTM block area / Census ALAND+AWATER = 0.99922, matching UTM 10N's areal scale factor at Portland (0.99922, from the CRS deep dive).
+  - Privacy-noise signals: 178 blocks with population but 0 housing units (5,940 people).
+  - Median income median CV 0.22; 12.6% of block groups have CV > 40%.
+- Boundary diagnostics: 328 county blocks touch the boundary but are represented outside; 194 of them overlap by < 1% (digitising slivers); 26 blocks (401 people) overlap ≥ 10%.
+- Idempotency: a second `process` produced **byte-identical** Parquet files.
+
+**Tests:** 92 passed (unit; mocked HTTP incl. 2-page ArcGIS and count mismatch; synthetic end-to-end region with hand-computed answers, reconciliation failure, idempotency, tampered raw file; 2 real-data tests marked `data`). ruff, ruff format, mypy --strict (30 files): clean.
+
+**Fixed during implementation**
+- Called the non-existent `GeoSeries.point_on_surface()`; the GeoPandas name is `representative_point()`.
+- The first boundary statistic ("328 straddlers, 20,914 people") overstated exclusion. Replaced with an overlap-fraction breakdown.
+
+**Licences:** City layers verified (public use, City Data Distribution Policy, "as is"). The Metro RLIS terms page is JavaScript-rendered: **still to verify manually**.
+
+**Not done (by design):** no PostGIS loading (Stage 4), parks (Stage 3), network (Stage 5). Nothing committed.

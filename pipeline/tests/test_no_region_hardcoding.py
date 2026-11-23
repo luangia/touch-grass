@@ -23,6 +23,8 @@ def _forbidden_tokens() -> set[str]:
         tokens.add(cfg.region_id)
         tokens.add(str(cfg.analysis_crs))
         tokens.add(cfg.name.split(",")[0].strip().lower())  # e.g. the city name
+        if cfg.validation.expected_population:
+            tokens.add(str(cfg.validation.expected_population))  # official totals belong in config
     return tokens
 
 
