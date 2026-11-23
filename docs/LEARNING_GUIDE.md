@@ -2,7 +2,7 @@
 
 A structured index of the concepts this project teaches, **where** each is learned (stage), and **how** you'll know you understand it. Detailed lessons are written to [`docs/learning/`](learning/) as each stage is completed.
 
-Legend: ☐ not started · ◐ in progress · ☑ learned (you can explain it and use it unaided)
+Legend: ☐ not started · ◐ introduced in an implemented stage · ☑ learned (you mark this once you can explain and use it unaided)
 
 ## Learning path at a glance
 
@@ -17,10 +17,10 @@ Each concept is taught with: **Intuition → Problem → Mechanics → Implement
 
 | Concept | Stage | You should be able to… | Status |
 |---|---|---|---|
-| Vector vs raster data | 1 | Say when to use each; why parks are vector and canopy is raster | ☐ |
-| Geospatial formats (GeoJSON, Shapefile, GeoPackage, GeoParquet, MVT) | 1, 8 | Pick a format and defend it; explain RFC 7946 lon/lat order | ☐ |
-| Coordinate reference systems, EPSG codes, datums | 1 | Read a CRS definition; explain NAD83 vs WGS 84 | ☐ |
-| Geographic vs projected coordinates | 1, 3 | Explain why `area` in degrees is meaningless; why Web Mercator distorts area | ☐ |
+| Vector vs raster data | 1 | Say when to use each; why parks are vector and canopy is raster | ◐ |
+| Geospatial formats (GeoJSON, Shapefile, GeoPackage, GeoParquet, MVT) | 1, 8 | Pick a format and defend it; explain RFC 7946 lon/lat order | ◐ |
+| Coordinate reference systems, EPSG codes, datums | 1 | Read a CRS definition; explain NAD83 vs WGS 84 | ◐ |
+| Geographic vs projected coordinates | 1, 3 | Explain why `area` in degrees is meaningless; why Web Mercator distorts area | ◐ |
 | Geometry validity (OGC Simple Features) | 2, 3 | Diagnose and repair a self-intersecting polygon | ☐ |
 | Spatial joins (point-in-polygon, intersects, nearest) | 2, 4 | Write the same join in GeoPandas and PostGIS | ☐ |
 | Spatial intersection / overlay | 3 | Measure overlap between two park datasets | ☐ |
@@ -60,10 +60,10 @@ Each concept is taught with: **Intuition → Problem → Mechanics → Implement
 | Data acquisition (APIs, FeatureServers, bulk files) | 2, 3 | Write an adapter with provenance and checksums | ☐ |
 | ETL pipeline design (raw → processed → loaded) | 2–4 | Explain idempotency and immutable raw data | ☐ |
 | Data cleaning & classification rules | 3 | Justify each park inclusion/exclusion rule | ☐ |
-| Coordinate transformations in practice (PyProj) | 1–3 | Transform safely; know `always_xy` | ☐ |
+| Coordinate transformations in practice (PyProj) | 1–3 | Transform safely; know `always_xy` | ◐ |
 | Reproducibility (manifests, pinned deps, run records) | 2, 6 | Re-run and get identical results | ☐ |
 | Data validation (invariants, reconciliation) | all | Write checks that catch silent spatial bugs | ☐ |
-| Configuration-driven multi-region design | 1, 2 | Explain how a new city is onboarded | ☐ |
+| Configuration-driven multi-region design | 1, 2 | Explain how a new city is onboarded | ◐ |
 
 ## 5. Web GIS
 
@@ -101,4 +101,4 @@ Each concept is taught with: **Intuition → Problem → Mechanics → Implement
 
 ## Lessons index
 
-- [Stage 1 — Foundations, environment & region config](learning/stage-01-foundations.md) (prepared)
+- [Stage 1 — Foundations, environment & region config](learning/stage-01-foundations.md) (implemented)

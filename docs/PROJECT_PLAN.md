@@ -1,6 +1,6 @@
 # Project Plan — TouchGrass
 
-> Status: **Planning complete, awaiting approval.** No stage has started.
+> Status: **Stage 1 implemented (2026-11-22), awaiting your review.** Stages 2–11 not started.
 > See [ARCHITECTURE.md](ARCHITECTURE.md) for design and [DECISIONS.md](DECISIONS.md) for the trade-offs behind it.
 
 ## 1. Problem
@@ -33,7 +33,7 @@ City parks are good for health, but "how many parks a city has" says little abou
 
 | # | Stage | Complexity | Learning difficulty | Est. effort |
 |---|---|---|---|---|
-| 1 | Foundations, environment & region config | Low | Low–Med | 0.5 day |
+| 1 | Foundations, environment & region config ✅ implemented, in review | Low | Low–Med | 0.5 day |
 | 2 | Boundaries & population data (Census/TIGER) | Medium | Medium | 1 day |
 | 3 | Parks & green space dataset | Medium | Medium | 1 day |
 | 4 | PostGIS database & spatial SQL | Medium | **High** | 1 day |

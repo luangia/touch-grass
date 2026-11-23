@@ -1,0 +1,55 @@
+[project]
+name = "touchgrass"
+version = "0.1.0"
+description = "Geospatial pipeline for measuring walkable access to parks and nature"
+authors = [
+    { name = "Luan Pham", email = "35203166+luangia@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+# Lower bounds = the oldest API we rely on; exact versions are pinned in uv.lock.
+dependencies = [
+    "pydantic>=2.7",   # v2 API: field_validator, model_validator, ConfigDict
+    "pyproj>=3.6",     # CRS.area_of_use, Transformer(always_xy=...)
+    "pyyaml>=6.0",
+    "typer>=0.12",
+]
+
+[project.scripts]
+touchgrass = "touchgrass.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.10.2,<0.11.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.10",
+    "pytest>=8.0",
+    "ruff>=0.5",
+    "types-pyyaml>=6.0",
+]
+
+[tool.uv]
+# Supply-chain guard + reproducibility: ignore packages published after this date.
+# Bump deliberately when upgrading dependencies (keep it >= 2 weeks in the past).
+exclude-newer = "2026-11-08T00:00:00Z"
+
+# ---------- tooling ----------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# E/F: pycodestyle + pyflakes, I: import order, B: bugbear, UP: pyupgrade,
+# N: naming, SIM: simplifications, RUF: ruff-specific.
+select = ["E", "F", "I", "B", "UP", "N", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"

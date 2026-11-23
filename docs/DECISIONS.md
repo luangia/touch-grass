@@ -178,4 +178,30 @@ A block is **underserved** if its network walking distance to the nearest park a
 
 **Status:** Accepted (2026-11-22)
 
-The folder is not yet a Git repository. Recommend `git init` at the start of Stage 1, with one commit per completed stage, only after your approval (per AGENTS.md §12). Raw downloaded data is git-ignored and reproduced by the pipeline.
+The project owner initialised the repository (remote `origin`, branch `main`) before Stage 1. Commit at most once per completed stage, with one commit per completed stage, only after your approval (per AGENTS.md §12). Raw downloaded data is git-ignored and reproduced by the pipeline.
+
+---
+
+## D-013 — PostGIS image on Apple Silicon: official amd64 image under emulation
+
+**Status:** Accepted (2026-11-22, Stage 1, within the approved D-009 stack)
+
+**Context.** The development Mac is arm64. On Docker Hub (checked 2026-11-22) the official `postgis/postgis:17-3.6` image is published for **amd64 only**. A community multi-arch build (`imresamu/postgis`) has arm64.
+
+**Decision.** Use the official image, pinned to `postgis/postgis:17-3.6`, with `platform: linux/amd64`. Docker Desktop runs it through Rosetta emulation.
+
+**Why.** It's the official, documented image and matches typical amd64 deployment targets. Our data volumes are small, so the emulation overhead doesn't matter. Verified: PostgreSQL 17.11, PostGIS 3.6.4, GEOS 3.14.1, PROJ 9.8.1.
+
+**Revisit if** Stage 4–6 queries are noticeably slow: switch to the multi-arch image or native Postgres.app.
+
+---
+
+## D-014 — Dependency resolution cutoff (`exclude-newer`)
+
+**Status:** Accepted (2026-11-22, Stage 1)
+
+**Context.** The first resolution pulled `types-pyyaml` published the same day. Very new releases carry the most supply-chain risk (hijacked or broken uploads), and "latest at lock time" isn't reproducible.
+
+**Decision.** `[tool.uv] exclude-newer` in `pipeline/pyproject.toml` (currently `2026-11-08`) means uv ignores any package published after that date. Exact versions and hashes are pinned in `uv.lock`. When upgrading, bump the date deliberately and keep it at least two weeks in the past.
+
+**Consequence.** We run slightly older patch releases (e.g., pydantic 2.14.3 rather than 2.14.4). The lower bounds in `pyproject.toml` only state the oldest API we rely on.

@@ -1,6 +1,6 @@
 # Stage 1 — Foundations, Environment & Region Config
 
-> Status: **prepared, not implemented.** Code snippets show the planned approach; none of them exist in the repo yet.
+> Status: **implemented 2026-11-22.** §1–10 are the preparation lesson; §12 describes what was actually built and how it differs from the plan.
 
 ## 1. Objective and expected outcome
 
@@ -342,7 +342,7 @@ $ uv run touchgrass regions validate broken-geographic
 (exit code 1)
 ```
 
-## 9. Decisions for you before implementation
+## 9. Decisions for you before implementation (resolved: Docker Desktop, Typer, `center_lonlat` check included)
 
 1. **Container runtime:** Docker Desktop / OrbStack / Colima, or Postgres.app (no Docker). *Recommendation: OrbStack or Docker Desktop.* Either way, you install it.
 2. **CLI library:** Typer (*recommended*) or stdlib argparse.
@@ -383,3 +383,58 @@ $ uv run touchgrass regions validate broken-geographic
 - Pydantic v2 docs: https://docs.pydantic.dev/
 - uv docs: https://docs.astral.sh/uv/
 - PostGIS Docker images: https://hub.docker.com/r/postgis/postgis
+
+## 12. What was built (post-implementation)
+
+### Differences from the plan
+- **CRS rule generalised.** Instead of `if epsg == 3857`, the rule rejects any *normal-aspect Mercator* by inspecting `crs.coordinate_operation.method_name` ("Popular Visualisation Pseudo Mercator", "Mercator (variant A)"). "Transverse Mercator" (UTM) is still allowed. This catches EPSG:3395 and other Mercator variants without a code list.
+- **PostGIS image runs under emulation** on Apple Silicon (D-013). The official image is amd64-only.
+- **Dependency cutoff** `exclude-newer` added to `pyproject.toml` (D-014).
+- **Automated hardcoding guard** (`tests/test_no_region_hardcoding.py`) instead of only a manual grep. It reads every region config and fails if its id, CRS code, or city name appears in `src/`.
+
+### Walkthrough: `touchgrass regions validate portland-or`
+
+```
+cli.regions_validate("portland-or")
+  └─ loader.load_region
+       ├─ _resolve: not a path → find_config_dir() walks up from cwd → <repo>/config
+       ├─ yaml.safe_load(...)            # text → dict (no code execution)
+       ├─ RegionConfig.model_validate     # dict → typed, frozen object
+       │    ├─ field checks: slug pattern, FIPS patterns, ranges, Literal["US"], extra=forbid
+       │    ├─ analysis_crs → core.crs.assert_analysis_crs(26910)
+       │    │     known? → projected? → meter axes? → not normal Mercator? ✓
+       │    └─ after all fields pass: center_lonlat inside 26910's area of use? ✓
+       └─ region_id == file stem? ✓
+  └─ _summary: derived thresholds 5/10/15 min × 80 m/min = 400/800/1200 m
+```
+
+Errors are collected, not raised one by one: Pydantic gathers every field error, the loader turns each into a `loc: message` line, and the CLI prints them all and exits 1.
+
+### Two things the tests taught us
+1. **Swapped (lat, lon) passes range checks.** `[41.88, -87.63]` has a valid longitude *and* a valid latitude. Only the area-of-use check caught it. Range validation is necessary but not sufficient for coordinates.
+2. **Leaks happen in docstrings first.** The guard flagged "Portland" in my own examples. A city name in shared code, even in a comment, is often the first step towards city-specific logic.
+
+### Independent verification
+PostGIS (its own PROJ 9.8.1 build inside the container) and PyProj on the host produced **identical** UTM 10N coordinates for the same point. Two independent implementations agreeing is stronger evidence than either alone.
+
+### Files
+| File | Role |
+|---|---|
+| `pipeline/src/touchgrass/core/crs.py` | Region-agnostic CRS rules and transformer factory |
+| `pipeline/src/touchgrass/config/models.py` | Pydantic schema (`RegionConfig`, `AnalysisParams`) |
+| `pipeline/src/touchgrass/config/loader.py` | Config discovery, YAML parsing, error formatting |
+| `pipeline/src/touchgrass/cli.py` | Typer CLI (`regions list/validate/show`) |
+| `config/regions/portland-or.yaml` | The only place Portland facts live |
+| `pipeline/tests/*` | 55 tests: CRS, schema, loader, CLI, hardcoding guard |
+| `docker-compose.yml`, `.env.example` | Local PostGIS |
+
+### Known limitations
+- `center_lonlat` is hand-entered. From Stage 2 it can be checked against the downloaded boundary's actual centroid.
+- The area-of-use check tests one point, not the whole region. A region straddling a UTM zone edge would pass. That's acceptable because UTM distortion just outside a zone is still small, but it's worth knowing.
+- `country: Literal["US"]` is intentionally narrow until non-US population adapters exist.
+- Docker's CLI is in `~/.docker/bin`. If `docker` isn't found in your terminal, add it to your PATH (Docker Desktop → Settings → Advanced can do this).
+
+### Exercises
+1. **Practical.** Without looking at `tests/conftest.py`, write `config/regions/seattle-wa.yaml` (pick the UTM zone yourself and find the King County FIPS code). Run `uv run touchgrass regions validate seattle-wa`. Then delete it, or keep it if you want the hardcoding guard to cover Seattle too.
+2. **Break it on purpose.** Set Portland's `analysis_crs` to `32611` (WGS 84 / UTM 11N). Predict which check fails and why, then run it.
+3. **Scenario.** A colleague's buffer of Portland parks reports Forest Park as ~10,400 acres; the official figure is about 5,200. What is the most likely cause, and which line of our code would have prevented it?

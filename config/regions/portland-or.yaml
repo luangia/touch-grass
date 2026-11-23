@@ -1,0 +1,28 @@
+# Region config: City of Portland, Oregon (DECISIONS.md D-001).
+# Everything Portland-specific lives here. Code reads it via touchgrass.config.
+# Data-source sections (boundary, neighborhoods, parks, population) are added in
+# Stages 2–3 together with the adapters that consume them.
+
+region_id: portland-or
+name: Portland, Oregon
+country: US
+
+# NAD83 / UTM zone 10N: projected, meters, scale error < ~0.1% across Portland (D-008).
+analysis_crs: 26910
+
+# Rough city center (lon, lat). Only used to check that analysis_crs covers the region.
+center_lonlat: [-122.65, 45.54]
+
+# Census identifiers. Portland lies mostly in Multnomah (051), with small parts in
+# Washington (067) and Clackamas (005) counties.
+state_fips: "41"
+county_fips: ["051", "067", "005"]
+
+# Pull walk network and parks from this far beyond the city limits so residents near
+# the edge can reach parks just outside (edge effect, D-001).
+buffer_m: 2000
+
+analysis:
+  walk_speed_kmh: 4.8      # 80 m/min → 5/10/15 min ≈ 400/800/1200 m
+  thresholds_min: [5, 10, 15]
+  max_snap_m: 500

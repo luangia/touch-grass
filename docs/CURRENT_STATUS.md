@@ -6,24 +6,35 @@ _Last updated: 2026-11-22_
 
 | Item | Status |
 |---|---|
-| Phase | **Stage 1 prepared** — awaiting implementation approval |
-| Current stage | None started. Next: **Stage 1 — Foundations, environment & region config** (lesson written: docs/learning/stage-01-foundations.md; implementation not yet approved) |
-| Code | None |
+| Phase | **Stage 1 implemented**, awaiting your review |
+| Current stage | Stage 1: Foundations, environment & region config (all acceptance criteria met; see IMPLEMENTATION_LOG) |
+| Next stage | Stage 2: Boundaries & population data. **Not started; needs your approval** |
+| Code | `pipeline/` package: CRS rules, region config schema/loader, CLI; 55 tests |
+| Database | PostGIS 3.6.4 running locally via `docker compose` (no tables yet) |
 | Data downloaded | None |
-| Git | Not initialized (proposed for Stage 1, D-012) |
+| Git | Repo on `main` with remote `origin`. Stage 1 changes **uncommitted**, awaiting your approval |
 
 ## Currently being worked on
 
-- Stage 1 preparation done. Waiting on three choices: container runtime (Docker not installed on this machine), CLI library (Typer vs argparse), optional CRS area-of-use check.
+- Nothing in progress. Stage 1 is waiting on your review and a decision on committing.
 
 ## Accepted decisions (summary)
 
-See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack; git initialized in Stage 1. Stage 11 (deployment) stays optional, done only if time allows.
+See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff).
+
+## How to run what exists
+
+```bash
+docker compose up -d db                      # from the repo root
+cd pipeline && uv run touchgrass regions validate portland-or
+uv run pytest
+```
 
 ## Next steps
 
-1. You install a container runtime (or choose Postgres.app) and answer the Stage 1 choices.
-2. After your explicit approval: `/learn:implement-stage 1`.
+1. Review Stage 1 (optionally `/learn:review` or `/learn:knowledge-check 1`).
+2. Approve or adjust the proposed commit.
+3. When ready: `/learn:prepare-stage` for Stage 2.
 
 ## Blockers / risks being watched
 
@@ -47,4 +58,5 @@ Target bullets (pending implementation):
 - ☐ Architected configuration-driven region onboarding so new cities require only a YAML config and data sources. _(Stages 1–2)_
 
 Completed so far:
-- Project planning and architecture design (no implementation yet).
+- Project planning and architecture design.
+- Stage 1: config-driven region model with validated CRS rules (projected, metric, non-Mercator, area-of-use check), a Typer CLI, a 55-test suite, and a containerised PostGIS environment. *Foundation only, not yet resume-worthy on its own.*

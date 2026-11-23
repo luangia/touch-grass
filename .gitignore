@@ -1,1 +1,29 @@
 CLAUDE.md
+
+# --- Environment & secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Data (reproduced by the pipeline, never committed) ---
+data/*
+!data/.gitkeep
+
+# --- Python ---
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# --- Node (Stage 9) ---
+node_modules/
+
+# --- OS / editors ---
+.DS_Store
+.idea/
+.vscode/

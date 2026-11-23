@@ -1,0 +1,24 @@
+# Local development database: PostgreSQL 17 + PostGIS 3.6.
+# The only service in the MVP (D-009). Start with:  docker compose up -d db
+services:
+  db:
+    # The official image is published for amd64 only; on Apple Silicon, Docker
+    # Desktop runs it under emulation (Rosetta). See DECISIONS.md D-013.
+    image: postgis/postgis:17-3.6
+    platform: linux/amd64
+    container_name: touchgrass-db
+    env_file: .env
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - tg_pgdata:/var/lib/postgresql/data # named volume: data survives restarts
+    healthcheck:
+      # $$ escapes $ so the variable is expanded inside the container, not by compose.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  tg_pgdata:
