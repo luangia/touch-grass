@@ -6,18 +6,17 @@ _Last updated: 2026-11-22_
 
 | Item | Status |
 |---|---|
-| Phase | **Stage 2 implemented**, awaiting your review |
-| Completed stages | 1: Foundations (2026-11-22) |
-| In review | 2: Boundaries & population data. All hard checks pass on real data (see IMPLEMENTATION_LOG) |
-| Next stage | 3: Parks & green space. **Not started; needs your approval** |
+| Phase | **Stages 1–2 complete. Stage 3 prepared**, awaiting implementation approval |
+| Completed stages | 1: Foundations · 2: Boundaries & population data (2026-11-23) |
+| Next stage | 3: Parks & green space. Lesson: [stage-03-parks-green-space.md](learning/stage-03-parks-green-space.md). **Not approved for implementation**; decisions Q1–Q7 pending |
 | Code | `pipeline/`: config, CRS rules, source adapters, spatial core, fetch/process/validate CLI; 92 tests |
-| Data | `data/raw/portland-or` (313 MB) and `data/processed/portland-or` (5 GeoParquet files + `validation.json`, 3.4 MB); git-ignored |
-| Database | PostGIS running, no tables yet (Stage 4) |
-| Git | Stage 2 changes **uncommitted** |
+| Data | `data/raw/portland-or` (313 MB), `data/processed/portland-or` (Stage 2 outputs); git-ignored |
+| Git | `main`, in sync with `origin` |
 
 ## Currently being worked on
 
-- Nothing in progress. Stage 2 is waiting on your review.
+- Stage 3 preparation done. Waiting on decisions Q1–Q7 and implementation approval.
+- ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
 
@@ -34,9 +33,8 @@ uv run pytest                            # add -m data for real-data checks only
 
 ## Next steps
 
-1. Review Stage 2 (`data/processed/portland-or/validation.json` is the best place to start).
-2. Decide on committing.
-3. When ready: `/learn:advance` to prepare Stage 3.
+1. Answer Stage 3 decisions Q1–Q7 (lesson §9).
+2. Approve implementation: `/learn:implement-stage 3`.
 
 ## Blockers / risks being watched
 

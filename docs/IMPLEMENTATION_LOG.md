@@ -176,3 +176,19 @@ Wrote `docs/learning/deep-dive-crs.md`. All numbers came from experiments run in
 ## 2026-11-23 — D-016 accepted; ParkServe consent requested
 
 The project owner accepted D-016 (cite TPL's published Portland figures; don't ingest ParkServe) and sent TPL a written-consent request for a limited, Portland-only comparison. Status: awaiting a response. No ParkServe data has been downloaded or used.
+
+---
+
+## 2026-11-23 — Stage 2 marked complete; Stage 3 prepared (no project code)
+
+**Stage 2 verification (rerun):** 92 tests (incl. 2 real-data) pass; lint and types clean; `validate` passes all hard checks; `fetch` fully cached; git clean and in sync. Open, non-blocking: ParkServe consent reply (D-016); the cached `study_boundary` manifest still carries the old attribution text.
+
+**Stage 3 research (in the scratchpad and throwaway environments; nothing added to the project):**
+- **Metro ORCA** (RLIS ArcGIS): parcels layer (15,093; `UNITTYPE`/`STATUS`/`RECREATION`/…) and Sites layer (6,465; `TYPE`). Validation subset `UNITTYPE IN ('Park','Natural Area') AND STATUS <> 'Planned'` = 4,129 in the buffer envelope.
+- **Overpass API:** HTTP 502 "currently at capacity", which recommends a local instance for automated use.
+- **Geofabrik:** dated Oregon extracts (yearly 1 Jan since 2014, monthly recent, daily last ~10 days). `oregon-261101.osm.pbf` (255 MB) downloaded to the scratchpad in 6 min 43 s; MD5 `7087d34f0aa8453c5a74f533196fe7de` matched the published checksum.
+- **OSMnx** 2.1.1 (`features_from_xml`, `graph_from_xml`) and **pyosmium** 4.3.2 checked in a clean uv-managed Python. A NumPy-1 ABI warning seen first came from the Anaconda base interpreter leaking into the *throwaway* env, not from either package.
+- The project venv is based on `/opt/anaconda3` (packages isolated; interpreter not reproducible). Housekeeping proposed (Q7).
+- **Tag census in the 2 km buffer:** one pyosmium pass, 52 s. Forest Park (4,821 acres) is `leisure=nature_reserve` + `boundary=protected_area`, **not** `leisure=park`; Washington Park is `protected_area` only. Reserve and protected-area polygons overlap 46.1 of 47.4 km². 1,304 entrance nodes.
+
+**Created:** `docs/learning/stage-03-parks-green-space.md` (decisions Q1–Q7 pending).
