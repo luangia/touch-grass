@@ -236,3 +236,17 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 - All hard checks pass; outputs byte-identical on rerun.
 
 **Tests:** 117 passed (3 new). ruff and mypy clean.
+
+---
+
+## 2026-11-23 — Stage 3 marked complete; Stage 4 prepared (no project code)
+
+**Stage 3 verification (rerun):** 117 tests (incl. 2 real-data) pass; `validate` passes all hard checks; `fetch` fully cached (11/11); working tree clean. Committed as `5005b57`; `main` 2 ahead of `origin`.
+
+**Environment finding:** the `touchgrass-db` container no longer existed (the data volume `touchgrass_tg_pgdata` did). It was recreated with `docker compose up -d db`: healthy, PostgreSQL 17.11 / PostGIS 3.6.4, no project tables.
+
+**Stage 4 research (read-only):**
+- Catalog: 8,500 `spatial_ref_sys` rows; extensions include `postgis_topology` and `postgis_tiger_geocoder`; `ST_AsMVT`, `ST_TileEnvelope`, `ST_Subdivide` etc. present; untuned defaults (`shared_buffers` 128 MB, `work_mem` 4 MB).
+- Python: pyogrio's GDAL has **no PostgreSQL driver**; psycopg 3.3.8 (libpq 18, binary COPY), SQLAlchemy 2.1.8 and GeoAlchemy2 0.21.0 resolve under the date cutoff (checked in a throwaway env).
+
+**Created:** `docs/learning/stage-04-postgis-spatial-sql.md` (decisions Q1–Q7 pending).

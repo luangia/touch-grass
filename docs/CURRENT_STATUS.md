@@ -6,17 +6,16 @@ _Last updated: 2026-11-22_
 
 | Item | Status |
 |---|---|
-| Phase | **Stage 3 implemented**, awaiting your review |
-| Completed stages | 1: Foundations · 2: Boundaries & population data |
-| In review | 3: Parks & green space. All hard checks pass incl. 5 sentinel parks; OSM vs ORCA precision 0.895 / recall 0.931 (after cutting golf/zoo out of parks) |
-| Next stage | 4: PostGIS database & spatial SQL. **Not started; needs your approval** |
-| Code | `pipeline/`: + OSM adapter (pyosmium), park rules, overlap merging, excluded-area subtraction, dataset comparison; 117 tests |
-| Data | raw 568 MB (incl. OSM snapshot 243 MB, ORCA 47 MB); processed: 8 GeoParquet files + reports; git-ignored |
-| Git | Stage 3 changes **uncommitted** |
+| Phase | **Stages 1–3 complete. Stage 4 prepared**, awaiting implementation approval |
+| Completed stages | 1: Foundations · 2: Boundaries & population · 3: Parks & green space (2026-11-23) |
+| Next stage | 4: PostGIS database & spatial SQL. Lesson: [stage-04-postgis-spatial-sql.md](learning/stage-04-postgis-spatial-sql.md). **Not approved for implementation**; decisions Q1–Q7 pending |
+| Code | `pipeline/`: config, CRS rules, adapters (ArcGIS, TIGER, ACS, OSM), spatial core, parks, fetch/process/validate CLI; 117 tests |
+| Database | PostGIS 3.6.4 running again (container recreated 2026-11-23 on the existing volume); no project tables yet |
+| Git | `main`, 2 commits ahead of `origin` (Stage 3 planning + Stage 3) |
 
 ## Currently being worked on
 
-- Waiting on your review of Stage 3. The golf/cemetery/zoo subtraction rule was approved and is implemented (D-018 amendment).
+- Stage 4 preparation done. Waiting on decisions Q1–Q7 and implementation approval.
 - ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
@@ -34,8 +33,8 @@ uv run pytest                            # add -m data for real-data checks only
 
 ## Next steps
 
-1. Review Stage 3 and decide on committing.
-2. When ready: `/learn:advance` to prepare Stage 4.
+1. Answer Stage 4 decisions Q1–Q7 (lesson §9).
+2. Approve implementation: `/learn:implement-stage 4`.
 
 ## Blockers / risks being watched
 
