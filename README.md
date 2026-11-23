@@ -17,6 +17,7 @@ uv run touchgrass regions validate portland-or
 uv run touchgrass fetch portland-or     # downloads ~480 MB once (cached afterwards)
 uv run touchgrass process portland-or   # offline: GeoParquet + validation report
 uv run touchgrass db migrate            # create/upgrade the PostGIS schema
+uv run touchgrass network portland-or   # walk graph, block origins, park access points (~2 min)
 uv run touchgrass load portland-or      # load the region (one transaction; rerun-safe)
 uv run pytest                           # db tests use a throwaway touchgrass_test database
 ```

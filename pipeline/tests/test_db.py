@@ -81,7 +81,7 @@ def _synthetic(tmp_path: Path, region_id: str = "testville-zz") -> tuple[RegionC
 
 def test_migrate_builds_schema_then_is_a_noop(empty_db: Conn) -> None:
     applied = migrate(empty_db)
-    assert [m.version for m in applied] == [1, 2, 3, 4]
+    assert [m.version for m in applied] == [m.version for m in discover()]
     assert migrate(empty_db) == []
     assert all(s.applied for s in status(empty_db))
     tables = {
@@ -109,7 +109,8 @@ def test_failed_migration_rolls_back(empty_db: Conn) -> None:
     broken = replace(migrations[3], sql="CREATE TABLE touchgrass.half_done (x int); SELECT 1/0;")
     with pytest.raises(MigrationError, match="0004"):
         migrate(empty_db, [*migrations[:3], broken])
-    assert [s.applied for s in status(empty_db, migrations)] == [True, True, True, False]
+    applied = [s.applied for s in status(empty_db, migrations)]
+    assert applied == [True, True, True] + [False] * (len(migrations) - 3)
     exists = empty_db.execute("SELECT to_regclass('touchgrass.half_done')").fetchone()
     assert exists == (None,)  # DDL is transactional: the table vanished with the rollback
 
@@ -336,3 +337,37 @@ def test_planner_uses_a_gist_index_for_the_join(
     root = (plan[0] if isinstance(plan[0], list) else json.loads(plan[0]))[0]["Plan"]
     indexes = {n.get("Index Name") for n in _plan_nodes(root)}
     assert indexes & {"analysis_areas_geom_gist", "census_blocks_rep_point_gist"}, indexes
+
+
+# ------------------------------------------------------------------- network (Stage 5)
+
+
+def test_load_includes_network_tables(db: Conn, tmp_path: Path) -> None:
+    from touchgrass.pipeline.network import run_network
+
+    from .test_network import build_network_region
+
+    cfg, paths = build_network_region(tmp_path)
+    result = run_network(cfg, paths)
+    loaded = dbload.load_region(db, cfg, paths)
+    assert loaded.rows["block_origins"] == len(result.frames["block_origins"])
+    assert loaded.rows["park_access_points"] == len(result.frames["park_access_points"])
+    # Every access point refers to a loaded park; every origin to a loaded block (FKs).
+    row = db.execute(
+        "SELECT count(*) FROM touchgrass.park_access_points a"
+        " JOIN touchgrass.parks p USING (region_id, park_id)"
+    ).fetchone()
+    assert row == (loaded.rows["park_access_points"],)
+
+
+def test_load_refuses_stale_network(db: Conn, tmp_path: Path) -> None:
+    from touchgrass.pipeline.network import run_network
+
+    from .test_network import build_network_region
+
+    cfg, paths = build_network_region(tmp_path)
+    run_network(cfg, paths)
+    blocks = gpd.read_parquet(paths.processed / "blocks.parquet")
+    blocks.to_parquet(paths.processed / "blocks.parquet", index=False, compression="gzip")
+    with pytest.raises(dbload.LoadError, match=r"blocks\.parquet changed"):
+        dbload.load_region(db, cfg, paths)

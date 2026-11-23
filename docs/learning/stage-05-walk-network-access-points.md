@@ -1,6 +1,6 @@
 # Stage 5: Pedestrian Network & Park Access Points
 
-> Status: **prepared, not implemented.** Code snippets show the planned approach.
+> Status: **implemented 2026-11-23, revised after your field check (§16), awaiting your review.** §13 is what was built, §14 the first results on Portland, §15 answers to §12, §16 the field check and the fixes it led to. Where implementation changed a number or a method from the probes, it is marked **(updated)**.
 > Facts marked **(measured 2026-11-23)** come from throwaway probe scripts run on the real dated extract (`oregon-261101.osm.pbf`) in a separate scratch environment. No project code was changed.
 
 ## 1. Objective and expected outcome
@@ -44,7 +44,7 @@ The probes below found real examples of **all three** in Portland's data.
 | Connectivity, OSMnx filter as is | 564 pieces; the largest holds 97.4% of nodes. **Hayden Island (623 nodes) is cut off.** 6,891 residents' nearest street is on a cut-off piece |
 | Connectivity, foot-legal cycleways allowed back in | 490 pieces; the largest holds **98.4%**. Hayden Island reconnects (26 of 27 blocks). 4,244 residents still off the largest piece (38 blocks, to explain in implementation) |
 | Snap to nearest **node** | median 51 m, p95 105 m; **93.1% of populated blocks within 100 m** (below the plan's tentative 95%) |
-| Snap to nearest **edge** | median 33 m, p95 49 m; **99.45% of residents within 100 m**. Snapping to nodes overstates by a median of 18 m |
+| Snap to nearest **edge** | median 33 m, p95 49 m; **99.45% of residents within 100 m** when snapping to any piece. **(updated)** Snapped to the main component only, as built: **99.35%**. Snapping to nodes overstates by a median of 18 m |
 | Parks with a street or path within 15 m of their edge | **463 of 473**. The 10 without are mostly **river islands** (Ross Island 13.7 ha, Tri-Club Island, Moore and Wright Islands) plus a few small ravine natural areas |
 | OSM entrance / gate nodes within 15 m of a park edge | 208, at 87 parks. 141 are gates; **19 are `access=private` or `no`** |
 
@@ -241,3 +241,85 @@ data/processed/<region>/
 - NetworkX docs: `MultiGraph`, `connected_components`, `multi_source_dijkstra`. https://networkx.org/documentation/stable/
 - OSM wiki: `Key:highway`, `Key:sidewalk` (`separate`), `Tag:highway=cycleway` (shared-use paths), `Key:entrance`. https://wiki.openstreetmap.org/
 - Bentley, J. L. (1975). *Multidimensional binary search trees used for associative searching* (KD-trees). CACM 18(9).
+
+## 13. What was built (2026-11-23)
+
+| Piece | Where | What it does |
+|---|---|---|
+| Config | `config/models.py`: `WalkFilter`, `NetworkConfig`; Portland's `network:` section | OSMnx's walk rules restated as defaults; `readmit` for shared-use paths; tolerance, entrance tags, thresholds |
+| Walk-way extraction | `sources/osm.py`: `walk_exclusion`, `extract_walk_ways` | One pass over the PBF: walkable ways with complete geometry → sorted `.osm` XML; exclusions counted by rule (ways, km); entrance/gate nodes |
+| Graph | `core/network.py`: `build_walk_graph` | `graph_from_xml` → clip → project → undirected → components (largest first, stable labels); canonical edges (`u ≤ v`, geometry from u, stable `edge_id`) |
+| Snapping | `core/snap.py`: `snap_to_edges` | STRtree nearest edge (lowest index wins ties) → connector + offsets |
+| Access | `core/access.py`: `park_access_points` | Edge-contact intervals + public entrances; `no_network_contact` per park |
+| Pipeline | `pipeline/network.py`, CLI `touchgrass network` | Outputs, report, 6 hard + 6 info checks, `network_review.geojson`, freshness guard for `load` |
+| Database | migration `0005_network.sql`; `db/load.py` | `block_origins`, `park_access_points` (FKs to blocks and parks), loaded in the same transaction |
+| Tests | `tests/test_network.py` (26), `tests/network_fixture.py`, +2 in `test_db.py`, +1 real-data | Filter rules, the Hayden effect on a synthetic grid, canonical edges, determinism, hand-computed snapping, access intervals, private gate, island park, end to end, stale-network refusal |
+
+**Changes from the plan:**
+- **Edge weights are UTM lengths, not OSMnx's `length`.** A test failed by 0.24% on east–west streets, and that turned out to be OSMnx's *spherical* haversine: on WGS 84, a parallel at 45° N curves with radius 6,389 km, not the sphere's 6,371 km. On 3,000 real edges, OSMnx is −0.28% to +0.05% depending on direction, while UTM is −0.039% everywhere (D-020).
+- **Freshness guard:** `load` refuses network outputs built from a different `parks.parquet` or `blocks.parquet` (SHA-256 in the report). Otherwise a later `process` could leave access points pointing at parks that no longer exist.
+
+## 14. Results on Portland (2026-11-23)
+
+| | |
+|---|---|
+| Run time | **106 s** (extract scan about 30 s, OSMnx build about 40 s); reruns are byte-identical |
+| Walk filter | 123,690 ways kept, including **712 re-admitted shared-use paths**. Excluded: `access=private` 12,797 ways (1,383 km); `sidewalk:*=separate` 3,870 (322 km); motorways and links 1,434 (320 km); `foot=no` 1,003 (113 km); cycleways without a foot tag 438 (21 km); others |
+| Graph | **105,395 nodes, 8,370 km** in the main component = **98.4%** of nodes; 490 pieces in all |
+| Origins | 10,372 populated blocks; connector median **33.3 m**, p95 48.9 m, max 507 m; **99.35% of residents and 99.41% of blocks within 100 m** |
+| Stranded | 4,244 residents in 38 blocks whose nearest street is a fragment (all ≤ 25 nodes: apartment-complex paths, a footway cut off by a private service road). Snapping them to the main network adds < 35 m for 30 of the 38 pieces, 36–82 m for four more, and 104–275 m for the last four (386 people) |
+| Over 500 m | 1 block: the 27th Hayden Island block (41 people, 507 m) |
+| Access points | **11,878**: 11,713 edge contacts + 165 entrances. 19 private gates and 18 entrances off the network excluded. **463 parks reachable, 10 without network contact** (Ross Island, Tri-Club Island, Moore and Wright Islands, Rivervilla Park, 3 ravine natural areas, 3 unnamed) |
+| Database | 86,063 rows in 11 tables, one transaction, 3.1 s |
+
+**Spot check of the sentinel parks** (contacts / entrances, and the named streets and trails that reach them):
+
+| Park | Contacts | Entrances | Reached from (examples) |
+|---|---|---|---|
+| Forest Park | 209 | 9 | many trails and streets on all sides |
+| Washington Park | 242 | 5 | |
+| Powell Butte Nature Park | 51 | 4 | SE 162nd Ave, SE Powell Blvd, **Springwater Corridor** (present only because of `readmit`) |
+| Mount Tabor Park | 136 | 8 | SE Yamhill St, SE 60th Ave, SE Lincoln St, SE Division St |
+| Laurelhurst Park | 86 | 0 | SE César E. Chávez Blvd, SE Oak St, SE Stark St, SE 33rd Ave: the streets that actually border it |
+
+**Not done by me: a visual check against OSM.** I can't look at a map. `data/processed/portland-or/network_review.geojson` holds the flagged blocks, parks without access, sentinel access points and stranded pieces, and opens in any GeoJSON viewer (e.g. QGIS or geojson.io). Please look at Hayden Island and two or three sentinel parks before Stage 6.
+
+**For Stage 6, the same-edge case:** if a block's origin lies on an edge that also has a park contact interval, the direct walk along that edge (`|position − interval|`, or 0 inside it) can be shorter than going via u or v. The virtual-source Dijkstra handles everything else, but this case needs its own check.
+
+## 15. Answers to §12
+
+1. **Multi-graph:** two different ways can join the same two intersections. In Portland, a street and a parallel park path often both run between the same corners, or a block has a mid-block alley. A simple `Graph` keeps one edge per node pair and could keep the *longer* one, so `MultiGraph` keeps both and Dijkstra takes the shorter.
+2. **A false connection is worse** for an access study. A false "unreachable" is loud: it shows up as missing values and gets investigated (that's how Hayden Island was found). A false connection across water is silent and makes residents look *better* served than they are, in exactly the cases (islands, rivers, freeways) an equity analysis exists to reveal.
+3. **Node-snapping error grows with block length.** The extra walk is roughly the distance from the house to the nearest corner, up to half a block. Downtown's 200 ft (61 m) blocks cap it at about 30 m; East Portland superblocks 400–600 m long allow 200–300 m. The bias is therefore largest in the neighborhoods Stage 7 cares most about, which is another reason to snap to edges.
+4. **Virtual source:** add one node S joined to each access edge's ends with weights `offset_u` and `offset_v`. Any shortest path from S to a node starts by "entering" at the cheapest access point, so one Dijkstra from S gives every node its distance to the *nearest* of all 11,878 access points at once. It's the same as multi-source Dijkstra, but with non-zero starting distances.
+
+## 16. Your field check, and what it changed (2026-11-23)
+
+You checked `network_review.geojson` against the map and against what's on the ground:
+
+| Check | Your finding | Cause | Fix |
+|---|---|---|---|
+| Hayden Island | Pass: walkable via I-5 | (re-admitted shared-use path) | none |
+| Laurelhurst, Mount Tabor | Pass | | none |
+| Rivervilla Park | Walkable from SE Courtney Ave | The park's neighborhood (a 193-node pocket of Oak Grove) connects to the city only outside the 2 km buffer, so clipping stranded it | Kept the 2 km extent (your choice A); the pocket is marked `touches_clip`, and the park's reason is `network_piece_cut_by_buffer_edge` |
+| Cottonwood Creek, Stephens Creek, Ravine Woods | Walkable | No mapped network within 15 m (28 m, 37 m, 91 m) | **Dry gap**: connect within 100 m if the gap crosses no water |
+| 3 unnamed "parks" | A private lot, a building, Cascade Athletic Club | `landuse=recreation_ground` / `village_green` | Both tags dropped (D-018 amendment 3) |
+| Hardtack Island block | An island | Snapped 275 m across the Willamette | **Dry snapping**: now `isolated` on its own piece |
+| Rose City Golf Course, wooded edge | Mainland | Nearest path a cart path or isolated track | Snapping them to the street network was right; unchanged |
+| Ross Island | Closed to the public | OSM has no `access` tag | Listed in `parks.closed_to_public` (D-018 amendment 4): excluded with that reason, guarded by a hard check that the id and name still match |
+
+**Why water and not a distance threshold:** Moore and Wright Islands is 26 m from the network, closer than Cottonwood Creek at 28 m. Only *what lies in between* tells them apart. The same rule separates floating homes (the point itself is on water, so a dock is assumed: 10 blocks, 254 people) from a genuine island (Hardtack: dry land, but open water to the mainland).
+
+**A trap found on the way:** rivers were missing from the first water extract. The park rule keeps an area if its *representative point* is inside the buffer, and the Willamette's lies far upstream. `extract_areas(keep="intersects")` fixes that for water. The park rule stays as it was, which is correct for parks.
+
+**Results after the fixes:**
+
+| | Before | After |
+|---|---|---|
+| Park units | 473 | **448** (24 weak-tag units, plus Ross Island closed) |
+| Parks reachable directly / via dry gap / not at all | 463 / – / 10 | **443 / 3 / 2** (Moore and Wright Islands: water; Rivervilla: clipped) |
+| Origins `ok` / `moorage` / `isolated` | n/a (all to main) | 10,361 / 10 (254 people) / 1 (19 people) |
+| Residents within 100 m | 99.35% | 99.36% |
+| Access points | 11,878 | 11,771 (11,605 contacts, 163 entrances, 3 gaps) |
+| OSM vs ORCA precision / recall | 0.8961 / 0.9309 | 0.8972 / 0.9284 (Ross Island is in ORCA but closed, a definitional disagreement) |
+| Run time | 106 s | 145 s (+ the water pass) |

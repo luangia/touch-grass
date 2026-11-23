@@ -250,6 +250,18 @@ def _park_checks(cfg: RegionConfig, frames: dict[str, Any], stats: dict[str, Any
             actual=len(cands),
         ),
     ]
+    # Every closure listed in config must still match a candidate (OSM ids can change).
+    names = dict(
+        zip(cands["osm_type"].str[0] + cands["osm_id"].astype(str), cands["name"], strict=True)
+    )
+    stale = [
+        f"{c.osm} ({c.name})"
+        for c in rules.closed_to_public
+        if c.osm not in names or str(names[c.osm]).casefold() != c.name.casefold()
+    ]
+    checks.append(
+        _hard("parks.closed_list_matched", not stale, "every listed id found", stale or "all found")
+    )
     missing = missing_sentinels(units, rules.sentinel_parks)
     checks.append(
         _hard("parks.sentinels_present", not missing, rules.sentinel_parks, missing or "all found")

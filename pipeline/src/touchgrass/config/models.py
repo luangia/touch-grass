@@ -8,10 +8,12 @@ never accepts settings that nothing uses:
   Stage 1: identity, CRS, census FIPS codes, buffer, analysis parameters.
   Stage 2: study boundary, analysis areas, census vintages/tables, validation targets.
   Stage 3: OSM extract (osm) and park classification rules (parks).
+  Stage 5: walk network and park access points (network).
 """
 
 from __future__ import annotations
 
+import re
 from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator, model_validator
@@ -154,6 +156,14 @@ class TagVeto(_StrictModel):
     unless: TagRule = Field(default_factory=dict)
 
 
+class ClosedPark(_StrictModel):
+    """A green space known to be closed to the public although OSM doesn't say so."""
+
+    osm: str = Field(pattern=r"^[nwr][1-9][0-9]*$", description="OSM id, e.g. 'w1365628608'")
+    name: str = Field(min_length=1, description="For humans; checked against the data")
+    source: str = Field(min_length=1, description="How we know (field check, agency notice)")
+
+
 class ParksConfig(_StrictModel):
     """Rules deciding which OSM areas are public green space (DECISIONS.md D-018).
 
@@ -162,7 +172,8 @@ class ParksConfig(_StrictModel):
          excluded by the first matching ``veto_tags`` group (D-018 amendment 2), else
          included (class ``natural_area`` if it has a ``natural_area_tags`` tag);
       2. otherwise the first ``exclude_tags`` group whose tags match gives the reason;
-      3. included candidates smaller than ``min_area_m2`` are excluded as too small;
+      3. included candidates smaller than ``min_area_m2`` are excluded as too small, and
+         those listed in ``closed_to_public`` are excluded with that reason;
       4. after merging, areas excluded for a ``subtract_reasons`` reason are cut out of
          the units that enclose them (units left below ``min_area_m2`` are dropped).
     """
@@ -188,6 +199,10 @@ class ParksConfig(_StrictModel):
         description="Exclude reasons whose areas are cut out of any park that encloses them "
         "(e.g. a golf course drawn inside a park outline)",
     )
+    closed_to_public: list[ClosedPark] = Field(
+        default_factory=list,
+        description="Known closures OSM doesn't record; better fixed in OSM (access=no) too",
+    )
     sentinel_parks: list[str] = Field(
         default_factory=list,
         description="Names that must appear among included parks (catches rule mistakes)",
@@ -203,10 +218,20 @@ class ParksConfig(_StrictModel):
     @model_validator(mode="after")
     def _veto_reasons_are_distinct(self) -> Self:
         clash = set(self.veto_tags) & (
-            set(self.exclude_tags) | {"included", "too_small", "access_restricted"}
+            set(self.exclude_tags)
+            | {"included", "too_small", "access_restricted", "closed_to_public"}
         )
         if clash:
             raise ValueError(f"veto_tags reasons {sorted(clash)} clash with other reasons")
+        return self
+
+    @model_validator(mode="after")
+    def _closed_unique(self) -> Self:
+        ids = [c.osm for c in self.closed_to_public]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"closed_to_public lists an OSM id twice: {ids}")
+        if "closed_to_public" in self.exclude_tags:
+            raise ValueError("'closed_to_public' is a built-in reason, not an exclude_tags key")
         return self
 
     @model_validator(mode="after")
@@ -224,6 +249,95 @@ class ParksConfig(_StrictModel):
             for key, values in rule.items():
                 out.setdefault(key, set()).update(values)
         return out
+
+
+# ---------------------------------------------------------------------------- network
+
+# OSMnx 2.1 `walk` filter (osmnx._overpass._get_network_filter("walk")), restated here so
+# the rules are visible, testable and overridable per region (DECISIONS.md D-020).
+OSMNX_WALK_EXCLUDE_HIGHWAY = (
+    "abandoned|bus_guideway|construction|cycleway|motor|no|planned|platform|proposed|"
+    "raceway|razed|rest_area|services"
+)
+
+
+def _osmnx_walk_exclude_tags() -> TagRule:
+    return {
+        "area": ["yes"],
+        "access": ["private"],
+        "foot": ["no"],
+        "service": ["private"],
+        "sidewalk": ["separate"],
+        "sidewalk:both": ["separate"],
+        "sidewalk:left": ["separate"],
+        "sidewalk:right": ["separate"],
+    }
+
+
+class WalkFilter(_StrictModel):
+    """Which OSM ``highway=*`` ways are walkable.
+
+    A way is walkable when it has a ``highway`` tag, no ``exclude_tags`` match, and either
+    its ``highway`` value does not match ``exclude_highway`` (a regex searched anywhere in
+    the value, as Overpass ``!~`` does) or it satisfies one of ``readmit`` (every key in
+    that entry matches). ``readmit`` cannot override ``exclude_tags``.
+    """
+
+    exclude_highway: str = Field(default=OSMNX_WALK_EXCLUDE_HIGHWAY, min_length=1)
+    exclude_tags: TagRule = Field(default_factory=_osmnx_walk_exclude_tags)
+    readmit: list[TagRule] = Field(
+        default_factory=list,
+        description="Ways excluded by exclude_highway that are walkable after all, e.g. "
+        "shared-use paths: {highway: [cycleway], foot: [designated, yes]}",
+    )
+
+    @field_validator("exclude_highway")
+    @classmethod
+    def _valid_regex(cls, v: str) -> str:
+        re.compile(v)
+        return v
+
+    @field_validator("readmit")
+    @classmethod
+    def _readmit_names_highway(cls, v: list[TagRule]) -> list[TagRule]:
+        for rule in v:
+            if "highway" not in rule:
+                raise ValueError(f"each readmit rule must constrain 'highway', got {rule}")
+        return v
+
+
+class NetworkConfig(_StrictModel):
+    """Walk network and park access points (DECISIONS.md D-005, D-006, D-020)."""
+
+    walk_filter: WalkFilter = Field(default_factory=WalkFilter)
+    access_tolerance_m: float = Field(
+        default=15,
+        gt=0,
+        le=100,
+        description="Network within this distance of a park edge counts as reaching the park",
+    )
+    entrance_tags: TagRule = Field(
+        default_factory=lambda: {"entrance": ["*"], "barrier": ["gate"]},
+        description="OSM nodes treated as park entrances when near a park edge",
+    )
+    entrance_exclude_access: list[str] = Field(default_factory=lambda: ["private", "no"])
+    water_tags: TagRule = Field(
+        default_factory=lambda: {
+            "natural": ["water"],
+            "waterway": ["riverbank"],
+            "landuse": ["reservoir", "basin"],
+        },
+        description="OSM areas a straight-line connector must not cross (rivers, lakes)",
+    )
+    max_park_gap_m: float = Field(
+        default=100,
+        ge=0,
+        le=500,
+        description="A park with no network within access_tolerance_m connects to the "
+        "nearest network within this distance, if the gap crosses no water",
+    )
+    min_main_component_share: float = Field(default=0.95, gt=0, le=1)
+    min_population_within_100m: float = Field(default=0.95, gt=0, le=1)
 
 
 # ----------------------------------------------------------------------------- region
@@ -259,6 +373,13 @@ class RegionConfig(_StrictModel):
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
     osm: OsmConfig | None = None
     parks: ParksConfig | None = None
+    network: NetworkConfig | None = None
+
+    @model_validator(mode="after")
+    def _network_needs_parks(self) -> Self:
+        if self.network is not None and self.parks is None:
+            raise ValueError("'network' requires 'parks' (access points are attached to parks)")
+        return self
 
     @model_validator(mode="after")
     def _parks_need_osm(self) -> Self:

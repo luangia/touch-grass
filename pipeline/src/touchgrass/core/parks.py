@@ -28,6 +28,7 @@ from touchgrass.core.geometry import area_m2, to_multipolygon
 INCLUDED = "included"
 TOO_SMALL = "too_small"
 ACCESS = "access_restricted"
+CLOSED = "closed_to_public"
 NO_RULE = "no_matching_rule"
 
 
@@ -83,6 +84,11 @@ def classify_candidates(
     small = out["included"] & (out["area_m2"] < rules.min_area_m2)
     out.loc[small, ["included", "reason"]] = [False, TOO_SMALL]
     out.loc[small, "park_class"] = None
+    closed_ids = {c.osm for c in rules.closed_to_public}
+    keys = out["osm_type"].str[0] + out["osm_id"].astype(str)
+    closed = out["included"] & keys.isin(closed_ids)
+    out.loc[closed, ["included", "reason", "rule_tag"]] = [False, CLOSED, "closed_to_public"]
+    out.loc[closed, "park_class"] = None
     return out
 
 

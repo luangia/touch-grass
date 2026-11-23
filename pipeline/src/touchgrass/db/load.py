@@ -32,6 +32,7 @@ from touchgrass.db import SCHEMA
 from touchgrass.db.migrate import require_current
 from touchgrass.paths import RegionPaths
 from touchgrass.pipeline import sources as src
+from touchgrass.pipeline.network import load_network_outputs, network_freshness_problems
 from touchgrass.pipeline.process import load_outputs, load_stats
 from touchgrass.pipeline.validate import failed, run_validation
 from touchgrass.sources.http import Manifest, manifest_path
@@ -50,6 +51,8 @@ DATA_TABLES = (
     "acs_estimates",
     "green_candidates",
     "parks",
+    "block_origins",
+    "park_access_points",
 )
 _ACS_COLUMN = re.compile(r"^(b\d{5}[a-i]?)_([em])(\d{3})$")
 
@@ -439,6 +442,105 @@ def _load_parks(cur: Cursor, region_id: str, parks: Any) -> int:
     )
 
 
+def _load_origins(cur: Cursor, region_id: str, origins: Any) -> int:
+    _copy_stage(
+        cur,
+        "stage_origins",
+        [
+            ("geoid20", "text"),
+            ("edge_id", "text"),
+            ("u", "int8"),
+            ("v", "int8"),
+            ("connector_m", "float8"),
+            ("offset_u_m", "float8"),
+            ("offset_v_m", "float8"),
+            ("nearest_component", "int4"),
+            ("flagged", "bool"),
+            ("snap_status", "text"),
+            ("component", "int4"),
+            ("wkb", "bytea"),
+        ],
+        zip(
+            _text(origins["geoid20"]),
+            _text(origins["edge_id"]),
+            _int(origins["u"]),
+            _int(origins["v"]),
+            _float(origins["connector_m"]),
+            _float(origins["offset_u_m"]),
+            _float(origins["offset_v_m"]),
+            _int(origins["nearest_component"]),
+            _bool(origins["flagged"]),
+            _text(origins["snap_status"]),
+            _int(origins["component"]),
+            _wkb(origins),
+            strict=True,
+        ),
+    )
+    return _insert(
+        cur,
+        f"""INSERT INTO {SCHEMA}.block_origins
+              (region_id, geoid20, edge_id, u, v, connector_m, offset_u_m, offset_v_m,
+               nearest_component, flagged, snap_status, component, geom)
+            SELECT %(region)s, geoid20, edge_id, u, v, connector_m, offset_u_m, offset_v_m,
+                   nearest_component, flagged, snap_status, component, ST_GeomFromWKB(wkb, 4326)
+            FROM stage_origins""",
+        region_id,
+        len(origins),
+        "block_origins",
+    )
+
+
+def _load_access_points(cur: Cursor, region_id: str, points: Any) -> int:
+    _copy_stage(
+        cur,
+        "stage_access",
+        [
+            ("access_id", "text"),
+            ("park_id", "text"),
+            ("method", "text"),
+            ("edge_id", "text"),
+            ("u", "int8"),
+            ("v", "int8"),
+            ("offset_u_m", "float8"),
+            ("offset_v_m", "float8"),
+            ("contact_start_m", "float8"),
+            ("contact_end_m", "float8"),
+            ("osm_node_id", "int8"),
+            ("gap_m", "float8"),
+            ("wkb", "bytea"),
+        ],
+        zip(
+            _text(points["access_id"]),
+            _text(points["park_id"]),
+            _text(points["method"]),
+            _text(points["edge_id"]),
+            _int(points["u"]),
+            _int(points["v"]),
+            _float(points["offset_u_m"]),
+            _float(points["offset_v_m"]),
+            _float(points["contact_start_m"]),
+            _float(points["contact_end_m"]),
+            _int(points["osm_node_id"]),
+            _float(points["gap_m"]),
+            _wkb(points),
+            strict=True,
+        ),
+    )
+    return _insert(
+        cur,
+        f"""INSERT INTO {SCHEMA}.park_access_points
+              (region_id, access_id, park_id, method, edge_id, u, v, offset_u_m, offset_v_m,
+               contact_start_m, contact_end_m, osm_node_id, gap_m, geom)
+            SELECT %(region)s, access_id, park_id, method, edge_id, u, v, offset_u_m,
+                   offset_v_m, contact_start_m, contact_end_m, osm_node_id, gap_m,
+                   ST_GeomFromWKB(wkb, 4326)
+            FROM stage_access""",
+        region_id,
+        len(points),
+        "park_access_points",
+    )
+
+
 # ------------------------------------------------------------------------- top level
 
 
@@ -478,6 +580,11 @@ def load_region(
         names = ", ".join(c.name for c in bad)
         raise LoadError(f"processed outputs fail validation ({names}); fix before loading")
     manifests = provenance(cfg, paths)
+    network = load_network_outputs(paths.processed) if cfg.network is not None else None
+    if network is not None:
+        stale = network_freshness_problems(paths.processed)
+        if stale:
+            raise LoadError(f"network outputs not loadable: {'; '.join(stale)}")
     acs_vintage = f"{cfg.census.acs.year - 4}-{cfg.census.acs.year}"
 
     result = LoadResult(cfg.region_id)
@@ -522,6 +629,12 @@ def load_region(
                 lambda: _load_candidates(cur, region, frames["green_candidates"]),
             )
             step("parks", lambda: _load_parks(cur, region, frames["parks"]))
+        if network is not None:
+            step("block_origins", lambda: _load_origins(cur, region, network["block_origins"]))
+            step(
+                "park_access_points",
+                lambda: _load_access_points(cur, region, network["park_access_points"]),
+            )
     result.seconds["transaction"] = time.perf_counter() - started
     say(f"committed in {result.seconds['transaction']:.2f} s")
 

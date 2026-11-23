@@ -113,6 +113,12 @@ Treating a park's centroid as its destination is wrong for large parks (Forest P
 
 **Decision.** Access points = union of (a) OSM `entrance=*` / gate nodes on the park boundary, (b) walk-network nodes where a path or street crosses into or touches the park boundary (within a small tolerance, default 15 m), and (c) a fallback of boundary points sampled every 50 m snapped to the network only if (a) and (b) produce nothing. The approach is documented as an approximation; fenced-off edges are a known limitation.
 
+**Amendment (2026-11-23, D-020 Q5):**
+- **(c) is removed.** In Portland, the 10 parks with no network within 15 m are mostly river islands (Ross Island, Tri-Club Island, Moore and Wright Islands), and snapping their edges to the nearest street would invent a crossing over the Willamette. They are reported as `no_network_contact`.
+- **(b) works on edges, not nodes.** After OSMnx simplification most boundary crossings are mid-edge, so an access point is the stretch of an edge within 15 m of the park: a contact interval, located by distance from each end.
+- **(a) excludes** `access=private` / `no` entrances, and entrances more than 15 m from the network.
+- **Second amendment (2026-11-23, after your field check):** a dry gap replaces the old fallback. A park with no contact and no entrance connects to the nearest network within `max_park_gap_m` (100 m), **if the straight gap crosses no OSM water**; the gap length is added to the walking cost. Field check: Cottonwood Creek (28 m), Stephens Creek (37 m) and Ravine Woods (91 m) are walkable and now connect. Moore and Wright Islands (26 m, all over water) and Ross Island stay unreachable. Distance alone could not separate these cases.
+
 ---
 
 ## D-007 — Spatial assignment rules
@@ -297,6 +303,16 @@ TouchGrass is a public portfolio project, so clipping, reprojecting or overlayin
 - Effect on Portland: 1.51 km² removed from 2 units; 1 unit dropped (a 0.16-acre recreation ground inside Waverly Country Club). OSM-vs-ORCA precision 0.877 → **0.895**, recall unchanged at 0.931.
 - Gardens are deliberately **not** subtracted: e.g., the International Rose Test Garden inside Washington Park is free and public.
 
+**Amendment 3 (2026-11-23, approved "C: drop but show me the named ones"):** `landuse=recreation_ground` and `landuse=village_green` are removed from `include_tags` and recorded under the exclude reason `sports_or_private_ground`, so they stay auditable.
+- **Why:** your Stage 5 map check found three unnamed "parks" that weren't parks: a private lot, a lawn now built on, and Cascade Athletic Club. All three got in through these tags. Of the 40 features included through them, the named ones were mostly sports facilities: school tennis courts, a motocross track, a paddock.
+- **Effect:** units 473 → 449 (24 removed; named: The Paddock, Lower School Field, Peter W. Stott Community Recreation Field, Tri-Club Island, Jackson Middle School Tennis Courts). Motocross, Glenhaven Skate Park and Bless Field were members of larger parks, which are unchanged. Park area 73.50 → 73.34 km²; precision 0.8961 → 0.8974, recall 0.9309 → 0.9303.
+
+**Amendment 4 (2026-11-23, approved "Exclude via config"):** `parks.closed_to_public` lists green spaces known to be closed although OSM doesn't record it. Each entry has the OSM id, a name and a source, and matching candidates are excluded with the reason `closed_to_public`.
+- **Portland's list:** Ross Island Natural Area (`w1365628608`; your field check; no OSM `access` tag).
+- **Hard check `parks.closed_list_matched`:** every listed id must still exist **with the same name**, so a deleted or reused OSM id forces a review instead of silently doing nothing.
+- **Effect:** units 449 → 448; park area 73.34 → 73.21 km²; precision 0.8974 → 0.8972, **recall 0.9303 → 0.9284**. Metro ORCA counts Ross Island as a natural area: a definitional disagreement between the sources ("exists" vs "open to the public"), not an error.
+- The better long-term fix is `access=no` in OSM itself; the list can then shrink.
+
 **Amendment 2 (2026-11-23, approved "Yes, amend D-018"):** querying the loaded parks in Stage 4 (the nearest park to Pioneer Courthouse Square was the courthouse itself) showed that include tags alone let in buildings and heritage sites.
 - New `parks.veto_tags`: checked after the access rule, it overrules an include tag. Each veto is `tags` (any match) plus an optional `unless` (any match cancels the veto); the value `"*"` matches any value of a key.
 - Portland vetoes:
@@ -332,3 +348,44 @@ TouchGrass is a public portfolio project, so clipping, reprojecting or overlayin
 - Every table's primary key starts with `region_id`, and every table cascades from `regions`. Reloading one region never touches another's rows, and a test checks this.
 - The column types enforce SRID 4326 and the geometry type. `CHECK` constraints restate the validation rules, e.g. `ST_IsValid`, non-negative counts, `included = (reason = 'included')`, `cardinality(member_ids) = n_members`.
 - The API (Stage 8) can connect read-only to the same schema. The pipeline stays the only writer.
+
+---
+
+## D-020 — Walk network: offline OSMnx build, walk filter, components, edge snapping
+
+**Status:** Accepted (2026-11-23, Stage 5 Q1–Q7, "Approve as recommended")
+
+| # | Choice |
+|---|---|
+| Q1 Source | pyosmium filters the **dated extract** (D-017) into `.osm` XML; `osmnx.graph_from_xml(bidirectional=True)` builds the graph. No Overpass, so parks and network come from the same snapshot. |
+| Q2 Walk filter | OSMnx 2.1 `walk` rules, restated in `config/models.py` and overridable per region, **plus `readmit`**: Portland re-admits `highway=cycleway` with `foot` ∈ {designated, yes, permissive}. |
+| Q3 Components | Keep the largest connected component. Every other piece is reported with the population whose nearest street is on it, and all blocks are snapped to the main component. |
+| Q4 Origins | Snap each populated block's representative point to the **nearest edge**, recording the connector length and the distance along the edge to each end (`offset_u_m`, `offset_v_m`). |
+| Q5 Access points | Edge contact + entrances; no sampled fallback. See the D-006 amendment. |
+| Q6 Storage | GeoParquet nodes, edges, origins and access points; PostGIS tables `block_origins` and `park_access_points` (migration 0005). The graph itself is not in PostGIS. |
+| Q7 Command | `touchgrass network <region>`, separate from `process`. |
+
+**Decisions made during implementation:**
+- **Edge weight = length in the analysis CRS (D-008), not OSMnx's `length`.** OSMnx measures haversine on a sphere (R = 6,371,009 m). Against WGS 84 ellipsoidal lengths on a sample of 3,000 Portland edges, OSMnx is median −0.11%, ranging from −0.28% (east–west) to +0.05% depending on direction. UTM 10N is −0.039% on every edge (its scale factor). OSMnx's value is kept as `osmnx_length_m`.
+- **Freshness guard:** `network_report.json` records the SHA-256 of `parks.parquet` and `blocks.parquet`. `load` refuses network outputs built from different files, because `process` may have changed the parks since.
+
+**Why the walk filter matters (Portland, measured):**
+- OSMnx's rules drop 119 km of foot-legal shared-use paths, among them the I-205 Multi-Use Path, Springwater Corridor and Marine Drive Trail.
+- They also disconnect Hayden Island, leaving 6,891 residents whose nearest street is off the main network.
+- With `readmit`, 712 ways return, the main component goes from 97.4% to 98.4% of nodes, and the stranded population falls to 4,244. That remainder is 38 small fragments, none larger than 25 nodes.
+
+**Known limitations:**
+- Residential streets without sidewalks count as walkable.
+- A fence along a park edge isn't modelled, so a perimeter street counts as access.
+- Streets tagged `sidewalk=separate` rely on the separately mapped sidewalks connecting at crossings.
+
+**D-020 amendment (2026-11-23, after your field check; approved "A: keep as is, B: use the more general approach"):**
+- **Connectors may not cross water.** Water = OSM `natural=water`, `waterway=riverbank`, `landuse=reservoir|basin` areas that *intersect* the buffer. Rivers are huge multipolygons whose representative point lies far upstream, so the park rule (representative point inside) would drop the Willamette. Each block snaps to the nearest main-network edge it can reach over dry land, and gets a `snap_status`:
+  - `ok`: 10,361 blocks, 652,230 people.
+  - `moorage`: the census point is on water (floating homes); a dock is assumed. 10 blocks, 254 people.
+  - `isolated`: no dry route to the main network, so it snaps to its own piece. 1 block: Hardtack Island, 19 people. It was previously bridged 275 m across the Willamette.
+  - `crosses_water`: no dry edge at all; flagged. None in Portland.
+- **All network pieces are kept** in `network_nodes` and `network_edges`, each with its `component` id, so isolated origins have edges to snap to. Stage 6 will find them unreachable unless their piece reaches a park.
+- **The network extent stays at the 2 km buffer (A).** Pieces the clip line cuts are now marked `touches_clip`, and a park without access gets a reason: `network_piece_cut_by_buffer_edge` (Rivervilla Park), `gap_crosses_water` or `no_network_within_max_gap`.
+- Schema change in migration 0006: `block_origins.snap_status`, `block_origins.component`, and `park_access_points.gap_m` plus method `gap`. 0005 is not edited.
+- Ross Island (closed to the public, not recorded in OSM) is resolved by D-018 amendment 4.

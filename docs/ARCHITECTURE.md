@@ -89,11 +89,25 @@ parks            (region_id, park_id, name, park_class, area_m2, subtracted_m2, 
 schema_migrations(version PK, filename, sha256, applied_at)          written by the runner
 ```
 
+**Added in Stage 5** (migration 0005, D-020):
+
+```
+block_origins      (region_id, geoid20, edge_id, u, v, connector_m, offset_u_m, offset_v_m,
+                    nearest_component, flagged, snap_status [ok|moorage|isolated|crosses_water],
+                    component, geom Point)                   PK (region_id, geoid20); FK → census_blocks
+park_access_points (region_id, access_id, park_id, method [edge_contact|entrance|gap], edge_id, u, v,
+                    offset_u_m, offset_v_m, contact_start_m, contact_end_m, osm_node_id, gap_m,
+                    geom Point)
+                                                             PK (region_id, access_id); FK → parks
+```
+
+Both locate a point *on* a network edge by its distance from each end; the graph itself (nodes, edges) is GeoParquet only.
+
 **Indexes:** GiST on every geometry column (plus `census_blocks.rep_point`); B-tree on `analysis_areas (region_id, area_type)`, `area_membership (region_id, geoid20)` and `green_candidates (region_id, reason)`.
 
 **Loading:** `touchgrass load <region>` re-validates the processed outputs, then in one transaction deletes the region (cascade), binary-`COPY`s each table into a temp staging table, and inserts with SQL conversions (WKB → geometry, lon/lat → Point, text → jsonb / text[]). `ANALYZE` runs after commit.
 
-**Planned for later stages** (not built yet): `analysis_runs`, `park_access_points`, `block_access` and `area_metrics` (Stages 5–7), each following the same `region_id` conventions.
+**Planned for later stages** (not built yet): `analysis_runs`, `block_access` and `area_metrics` (Stages 6–7), each following the same `region_id` conventions.
 
 **Why not store the walk graph in PostGIS?** We traverse it in Python (NetworkX). Persisting it as GraphML/GeoPackage in `data/processed/` is simpler. Edges may optionally be loaded for display later (pgRouting is a future option).
 
@@ -107,9 +121,9 @@ schema_migrations(version PK, filename, sha256, applied_at)          written by 
 | Dissolve | Merge touching park parts with same name/ID | Topology / unary union |
 | Buffer | Study boundary + 2 km | Buffer operation, edge effects |
 | Block assignment | Rep. point within boundary/area | Spatial join (point-in-polygon) |
-| Graph | `osmnx.graph_from_polygon(buffer, network_type="walk")`, made undirected | Graph model of networks |
-| Access points | Entrance nodes ∪ boundary-touching nodes | Spatial intersection, tolerance |
-| Snapping | Nearest node via spatial index (KD-tree/R-tree) | Nearest neighbor search |
+| Graph | pyosmium walk filter (config) → `.osm` XML → `osmnx.graph_from_xml(bidirectional=True)`; clip to buffer; project; undirected; largest component (D-020) | Graph model of networks |
+| Access points | Edge-contact intervals within 15 m of the park ∪ public entrance nodes; else a dry gap ≤ 100 m (D-006 amended) | Spatial intersection, tolerance |
+| Snapping | Nearest **edge** reachable without crossing water (STRtree); connector + offsets to both ends; `snap_status` | Nearest neighbor search, barriers |
 | Distances | `multi_source_dijkstra` from access nodes, cutoff ~2× max threshold | Shortest paths |
 | Straight-line | Nearest park polygon distance (`sjoin_nearest`) | Euclidean proximity |
 | Aggregate | Population-weighted shares per area | Spatial aggregation, weighting |

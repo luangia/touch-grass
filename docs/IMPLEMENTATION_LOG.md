@@ -297,3 +297,50 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 - Access: 463/473 parks have network within 15 m; the 10 without are mostly river islands. 208 entrance/gate nodes near parks, 19 private/no.
 
 **Created:** `docs/learning/stage-05-walk-network-access-points.md` (Q1–Q7 pending).
+
+## 2026-11-23 — Stage 5 implemented: walk network, block origins, park access points
+
+**Approval:** "Approve as recommended" (Q1–Q7, recorded as D-020 plus the D-006 amendment).
+
+**Added**
+- Dependencies `osmnx>=2.0`, `networkx>=3.2`, `scipy>=1.11` (2.1.1 / 3.7 / 1.18.1 resolved); mypy overrides for them.
+- Config: `WalkFilter`, `NetworkConfig`, `RegionConfig.network` (requires `parks`); Portland `network:` section with the shared-use `readmit`.
+- `sources/osm.py`: `walk_exclusion`, `extract_walk_ways`. `core/network.py`, `core/snap.py`, `core/access.py`. `pipeline/network.py`. CLI `touchgrass network`.
+- Migration `0005_network.sql`; loader loads `block_origins` and `park_access_points`, with a freshness guard.
+- Tests: `test_network.py` (26) + `network_fixture.py`; `osm_fixture.py` gains shared-node lines and tagged nodes; +2 db, +1 data. 173 total.
+
+**Problems hit**
+- The temp file was named `walk.osm.tmp`: osmium chooses the format by extension and refused it. Renamed to `walk.tmp.osm`.
+- Unnamed parks wrote `NaN` into the JSON report (invalid JSON). Fixed with `_records()`; the writer now uses `allow_nan=False`.
+- A test on edge lengths failed by 0.24%. Cause: OSMnx's spherical haversine. Weights switched to UTM lengths (D-020).
+- I miscounted the fixture's walkable ways in a test (13 vs the correct 10).
+- The hardcoding guard caught "Portland" in a docstring in `core/snap.py`; reworded.
+- DB tests assumed exactly 4 migrations; now derived from `discover()`.
+
+**Results:** see the lesson, §14. All 6 network hard checks pass; 99.35% of residents within 100 m; 463/473 parks reachable; reruns byte-identical; load 86,063 rows.
+
+**Not verified:** a visual map check of the access points against OSM (asked of the user). Nothing committed.
+
+## 2026-11-23 — Stage 5 revised after the field check
+
+**Your findings:** Hayden, Laurelhurst and Mount Tabor pass. Rivervilla, Cottonwood Creek, Stephens Creek and Ravine Woods are walkable. Three unnamed "parks" aren't parks. Hardtack Island is an island. Ross Island is closed to the public.
+
+**Diagnosis** (probes in the scratch area): a clipping pocket (Rivervilla); no mapped network within 15 m (3 parks); a weak park tag (the 3 non-parks); a straight connector over the Willamette (Hardtack). OSM water separated islands from set-back parks; a distance threshold could not (Moore and Wright Islands is 26 m away, Cottonwood 28 m).
+
+**Changes (approved A as is, B general, C drop + show named):**
+- `extract_areas(keep="intersects")`; `NetworkConfig.water_tags`, `max_park_gap_m`.
+- `core/snap.py`: `snap_to_edges_dry`, `water_crossing_m`. `core/access.py`: `gap` method. `core/network.py`: `touches_clip`.
+- `pipeline/network.py`: snap statuses, all components kept, no-access reasons. Migration `0006`; loader updated.
+- Portland config: dropped the two landuse include tags, added the exclude reason `sports_or_private_ground`.
+- Tests: +5 (dry snap, park gap vs island, origin statuses, intersects mode, clip marking). 178 total.
+
+**Bugs:** `df[mask] = df` sets columns, not rows (fixed with explicit `iloc`); an ambiguous test geometry (fixed with a triangle); "Portland" in a docstring again (the guard caught it).
+
+**Results:** lesson §16. Nothing committed.
+
+## 2026-11-23 — Ross Island excluded as closed to the public (approved "Exclude via config")
+
+- `ClosedPark` + `ParksConfig.closed_to_public`; the reason `closed_to_public` is applied in `classify_candidates` after the size rule. The hard check `parks.closed_list_matched` requires that the id exists and the name matches.
+- Portland lists Ross Island Natural Area (`w1365628608`).
+- Tests +4 (exclusion, missing id, wrong name, duplicate). 182 total, all passing.
+- Reprocessed, reran the network and reloaded: 448 parks, 73.21 km²; precision 0.8972, recall 0.9284 (ORCA includes Ross Island); 2 parks without network contact. Nothing committed.

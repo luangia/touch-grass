@@ -14,6 +14,9 @@ Stage 4 commands (PostGIS; settings from $DATABASE_URL or the repo's .env):
   touchgrass db migrate                        create/upgrade the schema
   touchgrass db status                         migrations + row counts per region
   touchgrass load <region-id>                  replace a region's rows, one transaction
+
+Stage 5 commands:
+  touchgrass network <region-id>               walk graph, block origins, park access points
 """
 
 from __future__ import annotations
@@ -32,6 +35,7 @@ from touchgrass.db.load import LoadError, row_counts
 from touchgrass.db.load import load_region as db_load_region
 from touchgrass.paths import RegionPaths, resolve_data_dir
 from touchgrass.pipeline.fetch import run_fetch
+from touchgrass.pipeline.network import run_network
 from touchgrass.pipeline.process import MissingDataError, load_outputs, load_stats, run_process
 from touchgrass.pipeline.validate import Check, failed, run_validation, write_report
 
@@ -156,7 +160,10 @@ def _region_and_paths(
 
 
 def _report(cfg: RegionConfig, checks: list[Check], out_dir: Path) -> None:
-    path = write_report(cfg, checks, out_dir)
+    _print_checks(checks, write_report(cfg, checks, out_dir))
+
+
+def _print_checks(checks: list[Check], path: Path) -> None:
     for c in checks:
         if c.severity == "hard":
             mark, color = ("✓", "green") if c.passed else ("✗", "red")
@@ -293,3 +300,35 @@ def load_cmd(
     typer.secho(
         f"\nloaded {cfg.region_id}: {total:,} rows in {len(result.rows)} tables", fg="green"
     )
+
+
+# ------------------------------------------------------------------- Stage 5: network
+
+
+@app.command("network")
+def network_cmd(
+    region: Annotated[str, typer.Argument(help="Region id.")],
+    config_dir: ConfigDirOption = None,
+    data_dir: DataDirOption = None,
+) -> None:
+    """Build the walk graph, snap block origins and find park access points (offline)."""
+    cfg, paths = _region_and_paths(region, config_dir, data_dir)
+    try:
+        result = run_network(cfg, paths, progress=lambda m: typer.echo(f"→ {m}"))
+    except MissingDataError as err:
+        typer.secho(f"✗ {err}", fg="red", err=True)
+        raise typer.Exit(code=1) from err
+    g, o, a = result.report["graph"], result.report["origins"], result.report["access"]
+    typer.echo(
+        f"\ngraph: {g['main_nodes']:,} nodes / {g['main_km']:,} km in the main component "
+        f"({g['main_component_share']:.1%} of nodes; {g['components']} pieces)"
+    )
+    typer.echo(
+        f"origins: {o['populated_blocks']:,} blocks, {o['population_within_100m']:.2%} of "
+        f"residents within 100 m; {o['stranded_population']:,} nearest to a stranded piece"
+    )
+    typer.echo(
+        f"access: {a['points']:,} points; {a['parks_reachable']} parks reachable, "
+        f"{len(a['parks_without_access'])} without network contact\n"
+    )
+    _print_checks(result.checks, paths.processed / "network_validation.json")

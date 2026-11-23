@@ -50,3 +50,20 @@ def test_city_total_equals_sum_of_blocks_not_areas(region_id: str) -> None:
         summed = int(members["geoid20"].map(pops).sum())
         covered = int(pops[pops.index.isin(members["geoid20"])].sum())
         assert summed >= covered, area_type  # double counting can only add
+
+
+@pytest.mark.skipif(not REGIONS, reason="no processed regions; run `touchgrass process`")
+@pytest.mark.parametrize("region_id", REGIONS)
+def test_network_outputs_are_current_and_pass(region_id: str) -> None:
+    from touchgrass.pipeline.network import load_network_outputs, network_freshness_problems
+
+    paths = RegionPaths(region_id, resolve_data_dir(REPO_CONFIG_DIR))
+    frames = load_network_outputs(paths.processed)
+    if frames is None:
+        pytest.skip("no network outputs; run `touchgrass network`")
+    assert network_freshness_problems(paths.processed) == []
+    origins = frames["block_origins"]
+    blocks = load_outputs(paths.processed)["blocks"]
+    assert set(origins["geoid20"]) == set(blocks.loc[blocks["pop20"] > 0, "geoid20"])
+    parks = load_outputs(paths.processed)["parks"]
+    assert set(frames["park_access_points"]["park_id"]) <= set(parks["park_id"])

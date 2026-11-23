@@ -19,6 +19,7 @@ class OsmFixture:
     ways: list[Way] = field(default_factory=list)
     relations: list[Relation] = field(default_factory=list)
     _next_node: int = 1
+    _by_coord: dict[tuple[float, float], int] = field(default_factory=dict)
 
     def ring(self, x0: float, y0: float, x1: float, y1: float) -> list[int]:
         """Add 4 corner nodes (counter-clockwise) and return a closed node-id ring."""
@@ -28,6 +29,27 @@ class OsmFixture:
             ids.append(self._next_node)
             self._next_node += 1
         return [*ids, ids[0]]
+
+    def node_at(self, lon: float, lat: float, **tags: str) -> int:
+        """A node at (lon, lat), shared by every line that passes the same point."""
+        key = (round(lon, 7), round(lat, 7))
+        if key in self._by_coord:
+            if tags:  # tag an existing node: replace it with a tagged copy
+                nid = self._by_coord[key]
+                self.nodes = [n for n in self.nodes if n.id != nid]
+                self.nodes.append(Node(id=nid, location=(lon, lat), tags=tags, version=1))
+            return self._by_coord[key]
+        nid = self._next_node
+        self._next_node += 1
+        self.nodes.append(Node(id=nid, location=(lon, lat), tags=tags, version=1))
+        self._by_coord[key] = nid
+        return nid
+
+    def line_way(self, way_id: int, coords: list[tuple[float, float]], **tags: str) -> None:
+        """An open way (street, path) whose nodes are shared at equal coordinates."""
+        self.ways.append(
+            Way(id=way_id, nodes=[self.node_at(x, y) for x, y in coords], tags=tags, version=1)
+        )
 
     def area_way(self, way_id: int, box: tuple[float, float, float, float], **tags: str) -> None:
         self.ways.append(Way(id=way_id, nodes=self.ring(*box), tags=tags, version=1))
@@ -65,7 +87,7 @@ class OsmFixture:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.unlink(missing_ok=True)  # SimpleWriter refuses to overwrite
         with osmium.SimpleWriter(str(path)) as w:  # nodes, then ways, then relations
-            for n in self.nodes:
+            for n in sorted(self.nodes, key=lambda n: n.id or 0):
                 w.add_node(n)
             for way in self.ways:
                 w.add_way(way)

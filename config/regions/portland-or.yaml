@@ -80,7 +80,9 @@ parks:
   include_tags:
     leisure: [park, nature_reserve, dog_park, common]
     boundary: [protected_area] # Washington Park is tagged only this way
-    landuse: [recreation_ground, village_green]
+    # landuse=recreation_ground / village_green were removed (D-018 amendment 3): in
+    # Portland's OSM they mostly mark sports facilities and private grounds (field check
+    # 2026-11-23: a private lot, a lawn now built on, Cascade Athletic Club).
   natural_area_tags:
     leisure: [nature_reserve] # Forest Park is a nature reserve, not leisure=park
     boundary: [protected_area]
@@ -95,6 +97,8 @@ parks:
       leisure: [pitch, playground, sports_centre, track]
     garden_fee_membership_or_private:
       leisure: [garden]
+    sports_or_private_ground: # D-018 amendment 3; kept as a reason so they stay auditable
+      landuse: [recreation_ground, village_green]
   exclude_access: [private, "no"]
   # Overrule an include tag (D-018 amendment 2). Found while querying PostGIS in Stage 4:
   # Pioneer Courthouse and Aubrey Watzek House are buildings, and the US Government Moorings
@@ -109,11 +113,16 @@ parks:
         protection_title: [protected_site]
       unless: # a real park that is also historic (e.g. Willamette Stone State Heritage Site)
         leisure: [park, nature_reserve, dog_park, common]
-        landuse: [recreation_ground, village_green]
   # Cut these out of park outlines that enclose them (D-018 amendment): e.g. the Heron
   # Lakes golf courses inside Delta Park West, the zoo inside Washington Park.
   subtract_reasons: [not_open_space]
   min_area_m2: 400
+  # Known closures OSM doesn't record (D-018 amendment 4). Better also fixed in OSM itself
+  # with access=no; then this list can shrink.
+  closed_to_public:
+    - osm: w1365628608
+      name: Ross Island Natural Area
+      source: "Field check 2026-11-23: island closed to the public (no OSM access tag)"
   # Metro ORCA parks and natural areas, used only to measure agreement (D-003).
   validation_source:
     adapter: arcgis_feature_layer
@@ -128,3 +137,14 @@ parks:
     - Mount Tabor Park
     - Laurelhurst Park
     - Powell Butte Nature Park
+
+# Walk network and park access points (Stage 5, D-020). The walk filter starts from
+# OSMnx's `walk` rules (defaults in code) and re-admits shared-use paths: OSMnx drops
+# every highway=cycleway, which removed 119 km of foot-legal trails here (I-205 Multi-Use
+# Path, Springwater Corridor, Marine Drive Trail) and cut Hayden Island off the network.
+network:
+  walk_filter:
+    readmit:
+      - highway: [cycleway]
+        foot: [designated, "yes", permissive]
+  access_tolerance_m: 15 # network this close to a park edge reaches the park (D-006)

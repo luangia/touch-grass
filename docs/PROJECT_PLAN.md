@@ -1,6 +1,6 @@
 # Project Plan — TouchGrass
 
-> Status: **Stages 1–4 complete. Stage 5 being prepared** (not approved for implementation). Stages 6–11 not started.
+> Status: **Stages 1–4 complete. Stage 5 implemented (2026-11-23), awaiting review.** Stages 6–11 not started.
 > See [ARCHITECTURE.md](ARCHITECTURE.md) for design and [DECISIONS.md](DECISIONS.md) for the trade-offs behind it.
 
 ## 1. Problem
@@ -156,7 +156,7 @@ Each stage: objective, functional requirements, concepts, dependencies, tasks, d
 
 ### Stage 5 — Pedestrian network & park access points
 
-> **Being prepared.** [Lesson](learning/stage-05-walk-network-access-points.md); decisions Q1–Q7 pending. The probes changed parts of the plan below: the network is built offline from the dated extract (not Overpass), foot-legal cycleways are re-admitted, origins snap to edges, and the sampled fallback is proposed for removal.
+> **Implemented 2026-11-23, awaiting review.** Decisions in D-020 (and the D-006 amendment); results in [the lesson](learning/stage-05-walk-network-access-points.md) §13–14. The probes changed parts of the plan below: the network is built offline from the dated extract (not Overpass), foot-legal cycleways are re-admitted, origins snap to edges, and the sampled fallback is proposed for removal.
 
 **Objective.** A clean, analysis-ready walking graph and a set of park access nodes.
 

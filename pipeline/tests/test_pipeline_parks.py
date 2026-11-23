@@ -141,3 +141,39 @@ def test_zoo_inside_park_is_cut_out(tmp_path: Path) -> None:
     assert len(unit.geometry.geoms[0].interiors) == 1  # the zoo is now a hole
     assert result.stats["parks"]["subtraction"]["units_cut"] == 1
     assert failed(run_validation(cfg, result.frames, result.stats)) == []
+
+
+def _with_closed(osm: str, name: str) -> RegionConfig:
+    data = parks_config(["West Woods"]).model_dump(mode="json")
+    data["parks"]["closed_to_public"] = [{"osm": osm, "name": name, "source": "test"}]
+    return RegionConfig.model_validate(data)
+
+
+def test_closed_park_is_excluded_with_reason(tmp_path: Path) -> None:
+    cfg = _with_closed("w11", "Corner Park")
+    paths = RegionPaths(cfg.region_id, tmp_path / "data")
+    build_park_raw(cfg, paths)
+    result = run_process(cfg, paths)
+    reasons = result.frames["green_candidates"].set_index("name")["reason"]
+    assert reasons["Corner Park"] == "closed_to_public"
+    unit = result.frames["parks"].iloc[0]
+    assert unit["n_members"] == 1  # West Woods alone now
+    assert failed(run_validation(cfg, result.frames, result.stats)) == []
+
+
+@pytest.mark.parametrize(("osm", "name"), [("w999", "Gone Park"), ("w11", "Wrong Name")])
+def test_stale_closed_entry_fails_validation(tmp_path: Path, osm: str, name: str) -> None:
+    cfg = _with_closed(osm, name)
+    paths = RegionPaths(cfg.region_id, tmp_path / "data")
+    build_park_raw(cfg, paths)
+    result = run_process(cfg, paths)
+    bad = {c.name for c in failed(run_validation(cfg, result.frames, result.stats))}
+    assert bad == {"parks.closed_list_matched"}
+
+
+def test_closed_list_rejects_duplicates() -> None:
+    data = parks_config([]).model_dump(mode="json")
+    entry = {"osm": "w1", "name": "X", "source": "t"}
+    data["parks"]["closed_to_public"] = [entry, entry]
+    with pytest.raises(ValueError, match="twice"):
+        RegionConfig.model_validate(data)
