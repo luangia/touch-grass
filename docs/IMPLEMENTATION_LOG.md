@@ -80,3 +80,24 @@ Chronological record of stages, changes, tests, and outcomes. Only work that act
 Wrote `docs/learning/deep-dive-crs.md`. All numbers came from experiments run in the project's pinned environment (pyproj 3.8.0, PROJ 9.8.1): PROJ pipelines and operation candidates, UTM and Web Mercator scale factors at Portland, geodesic vs projected distance error, and transformer creation vs bulk-transform cost. Exercise 2 (EPSG:32611) was verified on a temporary copy of the config; the real config was untouched.
 
 **Correction:** the Stage 1 lesson implied that WGS 84 → NAD83 applies a datum shift. PROJ's default is a zero-shift operation (EPSG "NAD83 to WGS 84 (1)", 4 m accuracy). The Stage 1 lesson is annotated.
+
+---
+
+## 2026-11-22 — Stage 1 marked complete; Stage 2 prepared (no code)
+
+**Stage 1 verification (rerun):** 55 tests pass; ruff and mypy clean; `regions validate portland-or` ✓; PostGIS healthy; working tree clean and in sync with `origin`. Marked complete after the project owner's review (`/learn:advance`).
+
+**Stage 2 research against live sources (read-only HTTP queries; nothing saved to the project):**
+- City of Portland `COP_OpenData_Boundary` MapServer:
+  - layer 10 City Boundaries (Metro-maintained; `CITYNAME='Portland'` → 4-part MultiPolygon, 16,420 vertices)
+  - layer 3 Neighborhood Boundaries (125 partition pieces)
+  - layer 125 Neighborhoods (regions) (97 overlapping, incl. 4 `MC UNCLAIMED` with `ID=0`)
+  - layer 1413 Council Districts (4; `pop_total` sums to 652,503)
+  - Native SRS 3857; supports GeoJSON, `outSR`, pagination (max 500).
+- The city's `Shape_Area`/`AREA` ratio is 2.04 (Web Mercator inflation), a real-data CRS example.
+- Census API returns 302 → `missing_key.html` without a key.
+- TIGER 2020 block file includes POP20/HOUSING20/INTPT (287 MB statewide).
+- ACS 2024 table-based summary files are key-free; 1,240 block groups in the 3 counties; sentinel values confirmed.
+- The City layer metadata page timed out, so licence wording is still to be verified during Stage 2.
+
+**Created:** `docs/learning/stage-02-boundaries-population.md` (decisions Q1–Q6 pending).

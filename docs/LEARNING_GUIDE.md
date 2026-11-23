@@ -102,4 +102,5 @@ Each concept is taught with: **Intuition → Problem → Mechanics → Implement
 ## Lessons index
 
 - [Stage 1 — Foundations, environment & region config](learning/stage-01-foundations.md) (implemented)
+- [Stage 2 — Boundaries & population data](learning/stage-02-boundaries-population.md) (prepared)
 - [Deep dive: Coordinate Reference Systems](learning/deep-dive-crs.md)
