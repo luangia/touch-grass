@@ -1,6 +1,6 @@
 # Project Plan — TouchGrass
 
-> Status: **Stages 1–3 complete. Stage 4 implemented (2026-11-23), awaiting review.** Stages 5–11 not started.
+> Status: **Stages 1–4 complete. Stage 5 being prepared** (not approved for implementation). Stages 6–11 not started.
 > See [ARCHITECTURE.md](ARCHITECTURE.md) for design and [DECISIONS.md](DECISIONS.md) for the trade-offs behind it.
 
 ## 1. Problem
@@ -132,7 +132,7 @@ Each stage: objective, functional requirements, concepts, dependencies, tasks, d
 
 ### Stage 4 — PostGIS database & spatial SQL
 
-> **Implemented 2026-11-23, awaiting review.** Decisions in D-019; details and measured plans in [the lesson](learning/stage-04-postgis-spatial-sql.md) §13–14.
+> **Complete (2026-11-23, commit `5a55c70`).** Decisions in D-019; details and measured plans in [the lesson](learning/stage-04-postgis-spatial-sql.md) §13–14.
 
 **Objective.** Persist processed data in a well-designed spatial schema and learn to query it efficiently.
 
@@ -155,6 +155,8 @@ Each stage: objective, functional requirements, concepts, dependencies, tasks, d
 ---
 
 ### Stage 5 — Pedestrian network & park access points
+
+> **Being prepared.** [Lesson](learning/stage-05-walk-network-access-points.md); decisions Q1–Q7 pending. The probes changed parts of the plan below: the network is built offline from the dated extract (not Overpass), foot-legal cycleways are re-admitted, origins snap to edges, and the sampled fallback is proposed for removal.
 
 **Objective.** A clean, analysis-ready walking graph and a set of park access nodes.
 

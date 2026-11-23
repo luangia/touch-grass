@@ -6,16 +6,16 @@ _Last updated: 2026-11-23_
 
 | Item | Status |
 |---|---|
-| Phase | **Stages 1–3 complete. Stage 4 implemented, awaiting your review** |
-| Completed stages | 1: Foundations · 2: Boundaries & population · 3: Parks & green space (2026-11-23) |
-| Current stage | 4: PostGIS database & spatial SQL. [Lesson](learning/stage-04-postgis-spatial-sql.md) §13 (built) and §14 (measured plans) |
-| Code | `pipeline/`: config, CRS rules, adapters, spatial core, parks, fetch/process/validate, **db migrate/status, load**; 144 tests (27 new, `db`-marked tests skip without a database) |
-| Database | PostGIS 3.6.4; schema `touchgrass` at migration 0004; **portland-or loaded** (63,813 rows, after the D-018 amendment 2 reprocess) |
-| Git | `main`, 2 commits ahead of `origin`. **Stage 4 prep and implementation are uncommitted** |
+| Phase | **Stages 1–4 complete. Stage 5 prepared**, awaiting implementation approval |
+| Completed stages | 1: Foundations · 2: Boundaries & population · 3: Parks & green space · 4: PostGIS & spatial SQL (2026-11-23) |
+| Next stage | 5: Pedestrian network & park access points. [Lesson](learning/stage-05-walk-network-access-points.md). **Not approved for implementation**; decisions Q1–Q7 pending |
+| Code | `pipeline/`: config, CRS rules, adapters, spatial core, parks, fetch/process/validate, db migrate/status, load; 144 tests |
+| Database | PostGIS 3.6.4; schema `touchgrass` at migration 0004; portland-or loaded (63,813 rows) |
+| Git | `main`, 1 commit ahead of `origin` (Stage 4, `5a55c70`). Stage 5 prep docs uncommitted |
 
 ## Currently being worked on
 
-- Stage 4 review. The park false positives found while querying are **fixed** (D-018 amendment 2: `veto_tags`; 477 → 473 units).
+- Stage 5 preparation done. Waiting on decisions Q1–Q7 and implementation approval. The probes found that OSMnx's walk filter drops 119 km of foot-legal shared-use paths and cuts off Hayden Island; the recommended answers fix both.
 - ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
@@ -35,9 +35,8 @@ uv run pytest                            # -m data / -m db to select; db tests u
 
 ## Next steps
 
-1. Review Stage 4 (`/learn:stage-review 4` or `/learn:review`).
-2. Commit when you're happy (nothing is committed yet).
-3. Then `/learn:advance` to prepare Stage 5 (walk network).
+1. Answer Stage 5 decisions Q1–Q7 (lesson §9).
+2. Approve implementation: `/learn:implement-stage 5`.
 
 ## Blockers / risks being watched
 
@@ -57,14 +56,14 @@ uv run pytest                            # -m data / -m db to select; db tests u
 Target bullets (pending implementation):
 - ☐ Built a reproducible geospatial ETL pipeline ingesting US Census (2020 blocks, ACS 5-year), TIGER/Line, and OpenStreetMap data with provenance tracking and automated validation. _(Stages 2–3)_
 - ☐ Computed pedestrian-network walking distance from ~N census blocks to nearest park access points using multi-source Dijkstra over an OSM walk graph, contrasting it with straight-line distance (median detour ratio X). _(Stages 5–6)_
-- ☐ Designed a multi-region PostGIS schema with GiST-indexed spatial joins, measuring an X× speedup via `EXPLAIN ANALYZE`. _(Stage 4; measured about 60×, finalize after review)_
+- ☑ Designed a multi-region PostGIS schema with GiST-indexed spatial joins, measuring a ~60× speedup via `EXPLAIN ANALYZE`. _(Stage 4)_
 - ☐ Produced population-weighted 5/10/15-minute park-access metrics for ~95 Portland neighborhoods, identifying X residents beyond a 10-minute walk. _(Stage 7)_
 - ☐ Delivered a typed FastAPI service (GeoJSON + PostGIS-generated vector tiles) and a React/MapLibre interactive map for neighborhood comparison. _(Stages 8–10)_
 - ☐ Architected configuration-driven region onboarding so new cities require only a YAML config and data sources. _(Stages 1–2)_
 
 Completed so far:
 - Project planning and architecture design.
-- Stage 4 (implemented, awaiting review): multi-region PostGIS schema with checksummed SQL migrations, typed SRID columns and constraints; atomic binary-COPY loader (63,817 rows in 1.7 s); PostGIS and GeoPandas membership agree exactly (24,785 pairs); GiST point-in-polygon join about 60× faster than without the index, measured with `EXPLAIN ANALYZE`.
+- Stage 4: multi-region PostGIS schema with checksummed SQL migrations, typed SRID columns and constraints; atomic binary-COPY loader (63,817 rows in 1.7 s); PostGIS and GeoPandas membership agree exactly (24,785 pairs); GiST point-in-polygon join about 60× faster than without the index, measured with `EXPLAIN ANALYZE`.
 - Stage 3: OSM park extraction from a checksummed snapshot with config-driven classification rules; overlapping features merged with union-find; validated against Metro ORCA (area precision 0.90, recall 0.93), with the 20 largest disagreements explained.
 - Stage 2: reproducible Census/TIGER/ArcGIS ETL; population reconciles exactly to the official 2020 total (652,503) and to all 4 council districts; overlapping-neighborhood membership model; 92 tests.
 - Stage 1: config-driven region model with validated CRS rules (projected, metric, non-Mercator, area-of-use check), a Typer CLI, a 55-test suite, and a containerised PostGIS environment. *Foundation only, not yet resume-worthy on its own.*

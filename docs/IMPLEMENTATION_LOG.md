@@ -285,3 +285,15 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 - Tests: +5 (4 rule cases, 1 clash validator). Total 144, all passing.
 - Reprocessed and validated (all hard checks pass), then reloaded: parks 477 → 473 with no other unit changed; precision 0.8952 → 0.8961, recall 0.9309 unchanged; load 63,813 rows.
 - Nothing committed.
+
+## 2026-11-23 — Stage 4 committed and complete; Stage 5 prepared (no project code)
+
+**Stage 4:** committed as `5a55c70`, which includes D-018 amendment 2. Verified afterwards: 144 tests, `validate` passes all hard checks, schema current, tree clean. `main` is 1 ahead of `origin`.
+
+**Stage 5 research** (throwaway scratch venv with osmnx 2.1.1 / networkx 3.7 / scipy 1.18.1 under the date cutoff; probe scripts outside the repo; read-only on data):
+- OSMnx has no PBF reader. `graph_from_xml` on pyosmium-filtered XML works: 28 s scan + 40 s build → 107,113 nodes / 8,375 km after clipping.
+- The OSMnx walk filter drops 119 km of `cycleway` + `foot=designated|yes` (I-205 MUP, Springwater, Marine Drive Trail) and leaves Hayden Island disconnected. Re-admitting foot-legal cycleways raises the main component from 97.4% to 98.4% of nodes, reconnects Hayden (26/27 blocks), and lowers the stranded population from 6,891 to 4,244.
+- Snapping: nodes 93.1% of blocks ≤ 100 m (median 51 m); edges 99.45% of residents ≤ 100 m (median 33 m).
+- Access: 463/473 parks have network within 15 m; the 10 without are mostly river islands. 208 entrance/gate nodes near parks, 19 private/no.
+
+**Created:** `docs/learning/stage-05-walk-network-access-points.md` (Q1–Q7 pending).
