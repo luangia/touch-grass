@@ -6,21 +6,22 @@ _Last updated: 2026-11-22_
 
 | Item | Status |
 |---|---|
-| Phase | **Stages 1–2 complete. Stage 3 prepared**, awaiting implementation approval |
-| Completed stages | 1: Foundations · 2: Boundaries & population data (2026-11-23) |
-| Next stage | 3: Parks & green space. Lesson: [stage-03-parks-green-space.md](learning/stage-03-parks-green-space.md). **Not approved for implementation**; decisions Q1–Q7 pending |
-| Code | `pipeline/`: config, CRS rules, source adapters, spatial core, fetch/process/validate CLI; 92 tests |
-| Data | `data/raw/portland-or` (313 MB), `data/processed/portland-or` (Stage 2 outputs); git-ignored |
-| Git | `main`, in sync with `origin` |
+| Phase | **Stage 3 implemented**, awaiting your review |
+| Completed stages | 1: Foundations · 2: Boundaries & population data |
+| In review | 3: Parks & green space. All hard checks pass incl. 5 sentinel parks; OSM vs ORCA precision 0.895 / recall 0.931 (after cutting golf/zoo out of parks) |
+| Next stage | 4: PostGIS database & spatial SQL. **Not started; needs your approval** |
+| Code | `pipeline/`: + OSM adapter (pyosmium), park rules, overlap merging, excluded-area subtraction, dataset comparison; 117 tests |
+| Data | raw 568 MB (incl. OSM snapshot 243 MB, ORCA 47 MB); processed: 8 GeoParquet files + reports; git-ignored |
+| Git | Stage 3 changes **uncommitted** |
 
 ## Currently being worked on
 
-- Stage 3 preparation done. Waiting on decisions Q1–Q7 and implementation approval.
+- Waiting on your review of Stage 3. The golf/cemetery/zoo subtraction rule was approved and is implemented (D-018 amendment).
 - ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
 
-See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff). Stage 2 added D-015 (data-source choices) and amended D-007 (Census interior points).
+See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff). Stage 2 added D-015 (data-source choices) and amended D-007 (Census interior points). Stage 3 added D-017 (dated OSM extracts + pyosmium; uv-managed Python) and D-018 (park rules and merging).
 
 ## How to run what exists
 
@@ -33,8 +34,8 @@ uv run pytest                            # add -m data for real-data checks only
 
 ## Next steps
 
-1. Answer Stage 3 decisions Q1–Q7 (lesson §9).
-2. Approve implementation: `/learn:implement-stage 3`.
+1. Review Stage 3 and decide on committing.
+2. When ready: `/learn:advance` to prepare Stage 4.
 
 ## Blockers / risks being watched
 
@@ -61,5 +62,6 @@ Target bullets (pending implementation):
 
 Completed so far:
 - Project planning and architecture design.
+- Stage 3: OSM park extraction from a checksummed snapshot with config-driven classification rules; overlapping features merged with union-find; validated against Metro ORCA (area precision 0.90, recall 0.93), with the 20 largest disagreements explained.
 - Stage 2: reproducible Census/TIGER/ArcGIS ETL; population reconciles exactly to the official 2020 total (652,503) and to all 4 council districts; overlapping-neighborhood membership model; 92 tests.
 - Stage 1: config-driven region model with validated CRS rules (projected, metric, non-Mercator, area-of-use check), a Typer CLI, a 55-test suite, and a containerised PostGIS environment. *Foundation only, not yet resume-worthy on its own.*

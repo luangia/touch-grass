@@ -11,7 +11,7 @@ import httpx
 from touchgrass.config import RegionConfig
 from touchgrass.paths import RegionPaths
 from touchgrass.pipeline.sources import RawSource, all_sources
-from touchgrass.sources import acs, arcgis, http
+from touchgrass.sources import acs, arcgis, http, osm
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +48,10 @@ def fetch_one(
             vintage=src.vintage,
             refresh=refresh,
         )
+    elif src.kind == "osm":
+        if cfg.osm is None:  # all_sources only emits osm sources when configured
+            raise ValueError("osm source requested but region has no 'osm' config")
+        manifest, downloaded = osm.fetch_extract(client, cfg.osm, src.path, refresh=refresh)
     else:  # acs: stream the nationwide file, keep only this region's block groups
         prefixes = acs.block_group_prefixes(cfg.state_fips, cfg.county_fips)
         manifest, downloaded = http.download(

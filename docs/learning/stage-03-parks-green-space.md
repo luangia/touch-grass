@@ -1,6 +1,6 @@
 # Stage 3: Parks & Green Space Dataset
 
-> Status: **prepared, not implemented.** Code snippets show the planned approach; none exist yet.
+> Status: **implemented 2026-11-23** with Q1–Q7 as recommended (D-017, D-018). §1–12 are the preparation lesson; §13 is what was built and what the real data showed; §14 explains the largest disagreements with ORCA.
 > Facts marked **(verified 2026-11-23)** were measured on the real sources while preparing this lesson.
 
 ## 1. Objective and expected outcome
@@ -316,3 +316,95 @@ parks:
 - Overpass API usage policy: https://wiki.openstreetmap.org/wiki/Overpass_API
 - Metro ORCA (RLIS Discovery): https://rlisdiscovery.oregonmetro.gov/
 - OSM licence (ODbL) and attribution: https://www.openstreetmap.org/copyright
+
+## 13. What was built (post-implementation)
+
+### Results on real Portland data
+
+| Measure | Result |
+|---|---|
+| OSM snapshot | `oregon-261101.osm.pbf`, 255,114,996 bytes, **MD5 verified** against Geofabrik |
+| Candidate areas in the buffer | 5,300 (from 52,836 matching areas in all of Oregon) |
+| Included | **531 candidates, 76.2 km²** |
+| Excluded by reason | land cover 1,891 (19.5 km²) · amenity 2,502 (3.9 km²) · not open space 45 (12.2 km²) · garden 284 (0.37 km²) · access 26 (0.14 km²) · too small 21 |
+| Park units after merging overlaps | **477** (363 parks, 114 natural areas), 73.6 km²; 41 units merged several features; 2 units had golf/zoo land cut out (1.51 km²), 1 dropped |
+| Sentinel parks | **all 5 found** (Forest, Washington, Mount Tabor, Laurelhurst, Powell Butte) |
+| Broken OSM relations | 37 candidate relations in the whole Oregon extract couldn't be assembled; 3 geometry errors |
+| ORCA features in the buffer | 3,185 (of 7,520 fetched metro-wide) |
+| **Area precision / recall** (ORCA as reference) | **0.895 / 0.931** after the subtraction rule (was 0.877 / 0.931); OSM 72.8 km², ORCA 70.0 km², overlap 65.2 km² |
+| Feature coverage | 80% of OSM units ≥ 1 acre are ≥ 50% covered by ORCA; 87% of ORCA features ≥ 1 acre are ≥ 50% covered by OSM |
+| Runtime / idempotency | `process` 48 s total (about 40 s is the OSM pass); second run **byte-identical** for all 8 files |
+
+### Differences from the plan
+- **The venv now runs on uv-managed CPython 3.12.12** (Q7). `[tool.uv] python-preference = "only-managed"` keeps it that way.
+- **`osm` and `parks` are optional config sections.** Regions without parks still process, which keeps the Stage 2 synthetic test region valid.
+- **ORCA is fetched metro-wide** with only its attribute filter (7,520 features, 47 MB) and clipped in `process`, so `fetch` never depends on processed outputs.
+- **Test fixtures are real `.osm.pbf` files** written with pyosmium's `SimpleWriter`, including a multipolygon with a hole and a deliberately broken relation. Two fixture mistakes of mine were caught by the code behaving correctly: a "hole" placed outside its outer ring (libosmium assigns rings by geometry, not role labels) and a feature just outside the buffer.
+
+### Known limitations
+- ~~Excluded land inside included parks is still counted as park.~~ **Resolved** by the D-018 amendment (§15).
+- **Linear trail corridors** (Springwater, Marine Drive) are areas in ORCA but lines in OSM. They'll contribute through the walking network in Stage 5, not as destinations.
+- Broken relations are counted for the whole state, not located within the buffer.
+- Names on units come from the largest *named* member, which may not be the name people use for the whole merged unit.
+
+## 14. The 20 largest disagreements, explained
+
+Method: for each piece, a live lookup of what **all** ORCA categories say at that point, plus every OSM candidate there (including excluded ones and their reasons).
+
+### OSM says park, our ORCA subset does not
+
+| Piece | Acres | What's there | Category |
+|---|---|---|---|
+| Delta Park West | 628 | ORCA: **Heron Lakes Golf Course** (Golf, Open_Fee). OSM: the park polygon encloses three golf-course polygons we excluded | **A: excluded facility inside a park polygon** |
+| Smith & Bybee Wetlands | 231 | ORCA: unnamed **"Other"** parcel (Bureau of Environmental Services) | B: ORCA category differs |
+| Buttes Natural Area | 119 | ORCA: nothing at this point | C: in OSM, absent from ORCA (needs a manual check) |
+| Washington Park | 65 | ORCA: **Oregon Zoo** ("Other", Open_Fee). OSM: protected-area boundary includes the zoo | **A** |
+| Mitchell Creek Natural Area | 58 | ORCA: nothing | C |
+| Catkin Marsh Natural Area | 54 | ORCA: nothing | C |
+| Lower Powell Butte Floodplain | 54 | ORCA: nothing | C |
+| Grant Butte Wetlands | 34 | ORCA: same name, category **"Other"** | B |
+| Southwest Community Park | 34 | ORCA: same name, status **"Planned"** (we filtered out Planned) | B (currency: built since, or mapped early in OSM) |
+| Forest Heights Open Space | 33 | ORCA: **Home Owners Association** land | B; possibly OSM over-inclusion (HOA land without `access=private`) |
+
+### ORCA says park or natural area, OSM does not (by our rules)
+
+| Piece | Acres | What's there | Category |
+|---|---|---|---|
+| Glendoveer Golf Course and Nature Trail | 231 | ORCA codes the whole site as Park; OSM has the golf course, which we exclude | D: our definition (the perimeter trail is public; the course isn't) |
+| Jenne Butte | 119 | ORCA Natural Area (Gresham, status Unknown); OSM nothing | E: OSM mapping gap or not publicly open |
+| Springwater Trail | 78 | ORCA Park (trail corridor); OSM maps it as a path | F: trail corridors are lines in OSM |
+| Zenger Farm | 46 | ORCA Natural Area (urban farm, BES); OSM no candidate | D: a farm, not a park by our definition |
+| Lower Abbey Creek NA (2 pieces) | 82 | ORCA Natural Area (Metro, status Unknown); OSM nothing | E |
+| Unnamed (ODOT) | 42 | ORCA Natural Area owned by the **Department of Transportation** | E: highway right-of-way vegetation, not public green space |
+| Unnamed (City of Portland) | 39 | ORCA Natural Area, status Unknown | E |
+| Kelly Butte Reservoir | 28 | ORCA Natural Area owned by the **Water Bureau** | E: restricted infrastructure; OSM correctly has no park |
+| Marine Drive Trail | 22 | ORCA Park (Port of Portland trail corridor); OSM `landuse=grass` (excluded as land cover) | F |
+
+### What the categories mean
+- **A (actionable, ~370 acres):** parks drawn around fee-charging or restricted facilities. Our rules exclude golf courses *as features* but not *as holes in parks*. Proposed fix: subtract `not_open_space` areas (golf, cemetery; optionally `tourism=zoo`) from park units. It matters most for Stage 5, where a golf-course fence must not count as a park entrance.
+- **B (~330 acres):** ORCA's own categories ("Other", "Planned", HOA) say "not a public park" where OSM says park. Mostly ORCA being stricter or more current about ownership. Forest Heights is the one where OSM may be wrong.
+- **C (~285 acres):** natural areas in OSM that ORCA doesn't list at all. Plausibly newer restoration sites or ORCA gaps; can't be settled from data alone.
+- **D, F:** genuine definitional or representational differences. Neither source is wrong.
+- **E:** ORCA "Natural Area" includes land the public can't use (transportation, reservoirs, closed sites), which is why recall can't reach 100% under our definition.
+
+**Conclusion:** with every large disagreement explained and the one rule gap (A) fixed (§15), the OSM-based dataset is fit for the MVP.
+
+## 15. Follow-up: cutting excluded facilities out of parks (D-018 amendment)
+
+**Rule.** `tourism=zoo` joins golf courses and cemeteries under `not_open_space`. `subtract_reasons: [not_open_space]` cuts those areas out of any merged unit that encloses them, then re-measures the unit and drops it if it falls below 400 m².
+
+**Why after merging, not before:** subtraction is a set difference, (A ∪ B) − H. Doing it once on the merged unit is equivalent to doing it per member, simpler, and cheaper.
+
+| | Before | After |
+|---|---|---|
+| Delta Park West | 628 acres | **319 acres** (307.8 acres of golf removed) |
+| Washington Park | 489 acres | **424 acres** (65.1 acres of zoo removed) |
+| Units | 478 | 477 (dropped: a 0.16-acre recreation ground inside Waverly Country Club, a private golf club) |
+| Precision vs ORCA | 0.877 | **0.895** |
+| Recall vs ORCA | 0.931 | 0.931 |
+
+**Why the recall didn't move is itself evidence:** the land we removed was not in ORCA's Park/Natural Area subset either (ORCA codes it Golf Course and Other/Open_Fee). Both sources now agree it isn't public park.
+
+**Not subtracted, on purpose:** gardens. Several sit inside parks and are free and public (International Rose Test Garden, Peninsula Park Rose Garden), so cutting them out would be wrong.
+
+**Tests added:** cut, drop and untouched cases; an unknown reason is rejected by config validation; an end-to-end zoo-inside-reserve case that becomes a polygon hole. 117 tests pass; outputs remain byte-identical on rerun.

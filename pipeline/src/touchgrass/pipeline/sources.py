@@ -12,9 +12,9 @@ from typing import Literal
 
 from touchgrass.config import RegionConfig
 from touchgrass.paths import RegionPaths
-from touchgrass.sources import acs, tiger
+from touchgrass.sources import acs, osm, tiger
 
-SourceKind = Literal["arcgis", "tiger", "acs"]
+SourceKind = Literal["arcgis", "tiger", "acs", "osm"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,11 +84,41 @@ def acs_sources(cfg: RegionConfig, paths: RegionPaths) -> list[RawSource]:
     ]
 
 
+def osm_source(cfg: RegionConfig, paths: RegionPaths) -> RawSource | None:
+    if cfg.osm is None:
+        return None
+    return RawSource(
+        source_id="osm_extract",
+        kind="osm",
+        url=osm.extract_url(cfg.osm),
+        path=paths.raw_source("osm") / osm.extract_filename(cfg.osm),
+        attribution=osm.OSM_ATTRIBUTION,
+        vintage=cfg.osm.snapshot,
+    )
+
+
+def park_validation_source(cfg: RegionConfig, paths: RegionPaths) -> RawSource | None:
+    if cfg.parks is None or cfg.parks.validation_source is None:
+        return None
+    v = cfg.parks.validation_source
+    sid = "parks_validation"
+    return RawSource(
+        source_id=sid,
+        kind="arcgis",
+        url=v.url,
+        path=paths.raw_source(sid) / f"{sid}.geojson",
+        attribution=v.attribution,
+        where=v.where,
+    )
+
+
 def all_sources(cfg: RegionConfig, paths: RegionPaths) -> list[RawSource]:
+    optional = [osm_source(cfg, paths), park_validation_source(cfg, paths)]
     return [
         boundary_source(cfg, paths),
         *area_sources(cfg, paths),
         tiger_source(cfg, paths, "tabblock20"),
         tiger_source(cfg, paths, "bg"),
         *acs_sources(cfg, paths),
+        *(s for s in optional if s is not None),
     ]

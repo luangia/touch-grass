@@ -69,3 +69,48 @@ census:
 validation:
   expected_population: 652503 # 2020 Census, City of Portland (P.L. 94-171)
   population_tolerance: 0.01
+
+# OpenStreetMap: a dated, checksummed Geofabrik extract (D-017). Bump deliberately.
+osm:
+  geofabrik_path: north-america/us/oregon
+  snapshot: "261101" # oregon-261101.osm.pbf = 1 Nov 2026
+
+# What counts as public green space (D-018). Excluded candidates are kept with a reason.
+parks:
+  include_tags:
+    leisure: [park, nature_reserve, dog_park, common]
+    boundary: [protected_area] # Washington Park is tagged only this way
+    landuse: [recreation_ground, village_green]
+  natural_area_tags:
+    leisure: [nature_reserve] # Forest Park is a nature reserve, not leisure=park
+    boundary: [protected_area]
+  exclude_tags:
+    not_open_space:
+      leisure: [golf_course]
+      landuse: [cemetery]
+      tourism: [zoo] # fee-charging; the Oregon Zoo sits inside Washington Park
+    land_cover_not_a_park:
+      landuse: [grass, forest, meadow]
+    amenity_usually_in_park_or_school:
+      leisure: [pitch, playground, sports_centre, track]
+    garden_fee_membership_or_private:
+      leisure: [garden]
+  exclude_access: [private, "no"]
+  # Cut these out of park outlines that enclose them (D-018 amendment): e.g. the Heron
+  # Lakes golf courses inside Delta Park West, the zoo inside Washington Park.
+  subtract_reasons: [not_open_space]
+  min_area_m2: 400
+  # Metro ORCA parks and natural areas, used only to measure agreement (D-003).
+  validation_source:
+    adapter: arcgis_feature_layer
+    url: https://services2.arcgis.com/McQ0OlIABe29rJJy/arcgis/rest/services/Outdoor_Recreation_and_Conservation_Areas_ORCA/FeatureServer/5
+    where: "UNITTYPE IN ('Park','Natural Area') AND STATUS <> 'Planned'"
+    attribution: >-
+      Regional Land Information System data are a product of Metro and made publicly available according to the license agreement found in https://rlisdiscovery.oregonmetro.gov/pages/open-database-license
+  # Large, well-known parks that must survive the rules (catches tag surprises).
+  sentinel_parks:
+    - Forest Park
+    - Washington Park
+    - Mount Tabor Park
+    - Laurelhurst Park
+    - Powell Butte Nature Park

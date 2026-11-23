@@ -7,6 +7,7 @@ Sections are added in the stage that implements the code consuming them, so the 
 never accepts settings that nothing uses:
   Stage 1: identity, CRS, census FIPS codes, buffer, analysis parameters.
   Stage 2: study boundary, analysis areas, census vintages/tables, validation targets.
+  Stage 3: OSM extract (osm) and park classification rules (parks).
 """
 
 from __future__ import annotations
@@ -124,6 +125,84 @@ class ValidationConfig(_StrictModel):
     )
 
 
+# ------------------------------------------------------------------------ parks (Stage 3)
+
+TagRule = dict[Annotated[str, Field(min_length=1)], list[Annotated[str, Field(min_length=1)]]]
+
+
+class OsmConfig(_StrictModel):
+    """A dated OpenStreetMap extract from Geofabrik (DECISIONS.md D-017)."""
+
+    geofabrik_path: str = Field(
+        pattern=r"^[a-z0-9-]+(/[a-z0-9-]+)*$",
+        description="Extract path on download.geofabrik.de, e.g. 'north-america/us/oregon'",
+    )
+    snapshot: str = Field(
+        pattern=r"^\d{6}$", description="Snapshot date YYMMDD, e.g. '261101' = 1 Nov 2026"
+    )
+
+    @property
+    def extract_name(self) -> str:
+        return self.geofabrik_path.rsplit("/", 1)[-1]
+
+
+class ParksConfig(_StrictModel):
+    """Rules deciding which OSM areas are public green space (DECISIONS.md D-018).
+
+    Order of evaluation for each candidate area:
+      1. has an ``include_tags`` tag → excluded if ``access`` ∈ ``exclude_access``,
+         else included (class ``natural_area`` if it has a ``natural_area_tags`` tag);
+      2. otherwise the first ``exclude_tags`` group whose tags match gives the reason;
+      3. included candidates smaller than ``min_area_m2`` are excluded as too small;
+      4. after merging, areas excluded for a ``subtract_reasons`` reason are cut out of
+         the units that enclose them (units left below ``min_area_m2`` are dropped).
+    """
+
+    include_tags: TagRule = Field(min_length=1)
+    exclude_tags: dict[Slug, TagRule] = Field(
+        default_factory=dict,
+        description="Reason → tags. Matching candidates are recorded with that reason",
+    )
+    exclude_access: list[str] = Field(default_factory=lambda: ["private", "no"])
+    natural_area_tags: TagRule = Field(default_factory=dict)
+    min_area_m2: float = Field(default=400, ge=0)
+    validation_source: ArcGISLayerSource | None = Field(
+        default=None, description="Authoritative park polygons to compare against"
+    )
+    subtract_reasons: list[Slug] = Field(
+        default_factory=list,
+        description="Exclude reasons whose areas are cut out of any park that encloses them "
+        "(e.g. a golf course drawn inside a park outline)",
+    )
+    sentinel_parks: list[str] = Field(
+        default_factory=list,
+        description="Names that must appear among included parks (catches rule mistakes)",
+    )
+
+    @model_validator(mode="after")
+    def _subtract_reasons_exist(self) -> Self:
+        unknown = set(self.subtract_reasons) - set(self.exclude_tags)
+        if unknown:
+            raise ValueError(f"subtract_reasons {sorted(unknown)} are not exclude_tags reasons")
+        return self
+
+    @model_validator(mode="after")
+    def _natural_tags_are_included(self) -> Self:
+        for key, values in self.natural_area_tags.items():
+            missing = set(values) - set(self.include_tags.get(key, []))
+            if missing:
+                raise ValueError(f"natural_area_tags {key}={sorted(missing)} not in include_tags")
+        return self
+
+    def candidate_tags(self) -> dict[str, set[str]]:
+        """Every key=value worth recording as a candidate (included or excluded)."""
+        out: dict[str, set[str]] = {}
+        for rule in (self.include_tags, *self.exclude_tags.values()):
+            for key, values in rule.items():
+                out.setdefault(key, set()).update(values)
+        return out
+
+
 # ----------------------------------------------------------------------------- region
 
 
@@ -155,6 +234,14 @@ class RegionConfig(_StrictModel):
     analysis_areas: list[AnalysisAreaSource] = Field(min_length=1)
     census: CensusConfig
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
+    osm: OsmConfig | None = None
+    parks: ParksConfig | None = None
+
+    @model_validator(mode="after")
+    def _parks_need_osm(self) -> Self:
+        if self.parks is not None and self.osm is None:
+            raise ValueError("'parks' requires an 'osm' section (parks are extracted from OSM)")
+        return self
 
     @field_validator("analysis_crs")
     @classmethod

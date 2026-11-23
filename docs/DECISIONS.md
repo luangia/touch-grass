@@ -244,3 +244,56 @@ TouchGrass is a public portfolio project, so clipping, reprojecting or overlayin
 **Recommendation.** Option 1 now. Option 2 is optional and can run in parallel (you'd send the request; I'd only draft it). Our own validation doesn't depend on ParkServe: it rests on OSM-vs-ORCA comparison, invariants, and independent route checks (Stages 3 and 6).
 
 **Consequences.** No ParkServe adapter, no ParkServe files in `data/`, and no ParkServe geometry in the app. The Stage 6 comparison becomes "our share vs TPL's published share", with the method differences explained (TPL uses half-mile walkable service areas from park access points).
+
+---
+
+## D-017 — OpenStreetMap from dated Geofabrik extracts, read with pyosmium; uv-managed Python
+
+**Status:** Accepted (2026-11-23, Stage 3 Q1, Q2, Q7, "Approve as recommended")
+
+**Context.** Stage 3 needs OSM park polygons; Stage 5 will need the walk network. During preparation the public Overpass API returned *"502 … currently at capacity"* and asks automated clients to run their own instance. Geofabrik keeps dated state extracts (yearly 1 January since 2014, monthly recent, daily for about 10 days), each with a published MD5.
+
+**Decision.**
+- Source: `https://download.geofabrik.de/<geofabrik_path>/<name>-<YYMMDD>.osm.pbf`, configured per region (`osm.geofabrik_path`, `osm.snapshot`). Portland: `north-america/us/oregon`, snapshot `261101` (1 Nov 2026).
+- `fetch` verifies the file against the published `.md5` and records it in the manifest; a mismatch deletes the file and fails.
+- Reading: **pyosmium** (libosmium) streams the PBF, keeps a node-location index, and assembles areas from closed ways and multipolygon/boundary relations. One pass over Oregon takes about 1 minute.
+- OSMnx stays planned for the Stage 5 network.
+- **Q7:** the project venv uses a uv-managed CPython 3.12 (`[tool.uv] python-preference = "only-managed"`), not the Anaconda interpreter it was first created from.
+
+**Consequences.** Results are reproducible from the cached snapshot plus checksum. A snapshot change is a deliberate config edit. Monthly files may eventually be pruned by Geofabrik, so the cached raw file and manifest are the record of what was used.
+
+---
+
+## D-018 — Park classification rules and overlap merging
+
+**Status:** Accepted (2026-11-23, Stage 3 Q3–Q6, "Approve as recommended")
+
+**Decision** (all in `config/regions/<region>.yaml` → `parks`):
+
+| Rule | Value (Portland) |
+|---|---|
+| Include | `leisure` = park, nature_reserve, dog_park, common; `boundary=protected_area`; `landuse` = recreation_ground, village_green |
+| Natural-area class | `leisure=nature_reserve`, `boundary=protected_area` |
+| Exclude: access | `access` ∈ {private, no} (even when an include tag is present) |
+| Exclude: not open space | golf_course, cemetery |
+| Exclude: land cover, not a park | landuse = grass, forest, meadow |
+| Exclude: amenity usually in a park or school | pitch, playground, sports_centre, track |
+| Exclude: garden (fee, membership or private) | leisure=garden |
+| Minimum area | 400 m² |
+| Merge | candidates whose interiors overlap by > 1 m² become one unit (union-find over an STRtree); touching parks stay separate |
+| Sentinel parks (hard check) | Forest Park, Washington Park, Mount Tabor Park, Laurelhurst Park, Powell Butte Nature Park |
+| Validation reference | Metro ORCA, `UNITTYPE IN ('Park','Natural Area') AND STATUS <> 'Planned'` |
+
+**Why.**
+- In Portland's OSM data, Forest Park is `leisure=nature_reserve` + `boundary=protected_area` and Washington Park is `boundary=protected_area` only, so a `leisure=park`-only rule would miss the city's two largest parks.
+- Reserve and protected-area polygons overlap 46.1 of 47.4 km², hence the merge.
+- Exclusions follow the working definition "public green space a resident can walk into and spend time in".
+
+**Consequences.** Every candidate is kept in `green_candidates.parquet` with its decision and reason, so any rule (e.g., cemeteries) can be flipped in config and its effect measured.
+
+**Amendment (2026-11-23, approved "Yes, plus the zoo"):** the discrepancy review found park outlines enclosing excluded facilities: the Heron Lakes golf courses inside Delta Park West (~308 acres) and the Oregon Zoo inside Washington Park (~65 acres).
+- `tourism=zoo` added to `not_open_space`.
+- New `parks.subtract_reasons: [not_open_space]`: after merging, those areas are cut out of enclosing units; units left below the minimum area are dropped.
+- Effect on Portland: 1.51 km² removed from 2 units; 1 unit dropped (a 0.16-acre recreation ground inside Waverly Country Club). OSM-vs-ORCA precision 0.877 → **0.895**, recall unchanged at 0.931.
+- Gardens are deliberately **not** subtracted: e.g., the International Rose Test Garden inside Washington Park is free and public.
+

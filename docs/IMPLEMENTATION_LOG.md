@@ -192,3 +192,47 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 - **Tag census in the 2 km buffer:** one pyosmium pass, 52 s. Forest Park (4,821 acres) is `leisure=nature_reserve` + `boundary=protected_area`, **not** `leisure=park`; Washington Park is `protected_area` only. Reserve and protected-area polygons overlap 46.1 of 47.4 km². 1,304 entrance nodes.
 
 **Created:** `docs/learning/stage-03-parks-green-space.md` (decisions Q1–Q7 pending).
+
+---
+
+## 2026-11-23 — Stage 3 implemented: Parks & green space
+
+**Approved by:** project owner ("Approve as recommended": Q1–Q7 → D-017, D-018).
+
+**Built**
+- Venv recreated on uv-managed CPython 3.12.12 (`python-preference = "only-managed"`); 92 existing tests passed on it before any Stage 3 code.
+- Dependency: `osmium` 4.3.2 (pyosmium).
+- Config: optional `osm` (Geofabrik path + snapshot) and `parks` (include/exclude tag rules with reasons, access exclusions, natural-area tags, min area, validation source, sentinel parks); `parks` requires `osm`. Portland config filled in.
+- `sources/osm.py`: Geofabrik URL, download + **MD5 verification** (mismatch deletes and fails), pyosmium area extraction (`with_locations` + `with_areas(KeyFilter)`), study-area filter by representative point, broken-relation detection.
+- `core/parks.py`: rule engine (first-match, documented order; `access` beats include tags; size check after); overlap merging via STRtree pairs + union-find (interiors overlapping > 1 m², touching stays separate); sentinel check.
+- `core/compare.py`: area precision/recall, feature coverage, discrepancy pieces.
+- Pipeline: two new sources (OSM extract, ORCA), a parks step in `process` (`green_candidates`, `parks`, `park_discrepancies`), park checks in `validate`.
+
+**Real data**
+- `fetch`: OSM snapshot 243 MB in about 10 min (MD5 `7087d34f0aa8453c5a74f533196fe7de` verified); ORCA 7,520 features (47 MB).
+- `process`: 48 s; all hard checks pass incl. **all 5 sentinel parks**. 531 included candidates → 478 units (75.1 km²). OSM vs ORCA area **precision 0.877, recall 0.931**. Byte-identical on rerun.
+- Top 10 discrepancies in each direction investigated with live ORCA lookups (lesson §14). Finding A: park polygons enclosing excluded fee facilities (Heron Lakes golf courses ~308 acres in Delta Park West; Oregon Zoo in Washington Park). **A subtraction rule is proposed, not implemented** (would change D-018).
+
+**Tests:** 114 passed (rules, merge incl. transitivity, comparison, real-PBF fixtures with a multipolygon hole and a broken relation, synthetic end-to-end with parks, missing-sentinel failure, data tests). ruff, mypy --strict (36 files) clean.
+
+**Fixed during implementation:** mypy caught the untyped pyosmium object union (now `isinstance` narrowing). Two test-fixture mistakes (see lesson §13). The parks code was correct in both cases.
+
+---
+
+## 2026-11-23 — D-018 amendment: cut golf courses, cemeteries and the zoo out of parks
+
+**Approved by:** project owner ("Yes, plus the zoo").
+
+**Changed:**
+- `ParksConfig.subtract_reasons` (validated against `exclude_tags` reasons).
+- `core.parks.subtract_excluded` (difference after merging; re-measure; drop units < min area).
+- Process stats `parks.subtraction`.
+- Portland config: `tourism: [zoo]` under `not_open_space`, `subtract_reasons: [not_open_space]`.
+
+**Real data:**
+- 1.51 km² removed from 2 units: Delta Park West −307.8 acres (Heron Lakes golf), Washington Park −65.1 acres (Oregon Zoo).
+- 1 unit dropped (0.16-acre recreation ground inside Waverly Country Club).
+- Precision 0.877 → 0.895; recall 0.931 unchanged.
+- All hard checks pass; outputs byte-identical on rerun.
+
+**Tests:** 117 passed (3 new). ruff and mypy clean.

@@ -25,7 +25,7 @@ Each concept is taught with: **Intuition → Problem → Mechanics → Implement
 | Spatial joins (point-in-polygon, intersects, nearest) | 2, 4 | Write the same join in GeoPandas and PostGIS | ◐ |
 | Spatial intersection / overlay | 3 | Measure overlap between two park datasets | ◐ |
 | Buffers and edge effects | 2, 6 | Explain why the study area is buffered; why buffers ≠ walk sheds | ◐ |
-| Spatial indexing (R-tree, KD-tree) | 4, 5 | Explain filter-and-refine; when an index won't help | ☐ |
+| Spatial indexing (R-tree, KD-tree) | 4, 5 | Explain filter-and-refine; when an index won't help | ◐ |
 
 ## 2. Spatial analysis
 
@@ -59,7 +59,7 @@ Each concept is taught with: **Intuition → Problem → Mechanics → Implement
 |---|---|---|---|
 | Data acquisition (APIs, FeatureServers, bulk files) | 2, 3 | Write an adapter with provenance and checksums | ◐ |
 | ETL pipeline design (raw → processed → loaded) | 2–4 | Explain idempotency and immutable raw data | ◐ |
-| Data cleaning & classification rules | 3 | Justify each park inclusion/exclusion rule | ☐ |
+| Data cleaning & classification rules | 3 | Justify each park inclusion/exclusion rule | ◐ |
 | Coordinate transformations in practice (PyProj) | 1–3 | Transform safely; know `always_xy` | ◐ |
 | Reproducibility (manifests, pinned deps, run records) | 2, 6 | Re-run and get identical results | ◐ |
 | Data validation (invariants, reconciliation) | all | Write checks that catch silent spatial bugs | ◐ |
@@ -103,5 +103,5 @@ Each concept is taught with: **Intuition → Problem → Mechanics → Implement
 
 - [Stage 1 — Foundations, environment & region config](learning/stage-01-foundations.md) (implemented)
 - [Stage 2 — Boundaries & population data](learning/stage-02-boundaries-population.md) (implemented)
-- [Stage 3 — Parks & green space](learning/stage-03-parks-green-space.md) (prepared)
+- [Stage 3 — Parks & green space](learning/stage-03-parks-green-space.md) (implemented)
 - [Deep dive: Coordinate Reference Systems](learning/deep-dive-crs.md)

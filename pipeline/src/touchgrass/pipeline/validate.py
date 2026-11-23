@@ -15,7 +15,9 @@ from typing import Any, Literal
 import pandas as pd
 
 from touchgrass.config import RegionConfig
+from touchgrass.core.compare import ACRE_M2
 from touchgrass.core.crs import STORAGE_EPSG
+from touchgrass.core.parks import INCLUDED, missing_sentinels
 from touchgrass.sources.http import now_utc
 
 VALIDATION_FILE = "validation.json"
@@ -227,11 +229,57 @@ def _acs_checks(cfg: RegionConfig, bgs: Any) -> list[Check]:
     return checks
 
 
+def _park_checks(cfg: RegionConfig, frames: dict[str, Any], stats: dict[str, Any]) -> list[Check]:
+    if cfg.parks is None or "parks" not in frames:
+        return []
+    rules, units, cands = cfg.parks, frames["parks"], frames["green_candidates"]
+    checks = [
+        _hard("parks.ids_unique", bool(units["park_id"].is_unique), actual=len(units)),
+        _hard(
+            "parks.min_area",
+            bool((units["area_m2"] >= rules.min_area_m2).all()),
+            rules.min_area_m2,
+            round(float(units["area_m2"].min()), 1) if len(units) else None,
+        ),
+        _hard(
+            "green_candidates.decisions_complete",
+            bool(
+                cands.loc[cands["included"], "park_class"].notna().all()
+                and (cands.loc[~cands["included"], "reason"] != INCLUDED).all()
+            ),
+            actual=len(cands),
+        ),
+    ]
+    missing = missing_sentinels(units, rules.sentinel_parks)
+    checks.append(
+        _hard("parks.sentinels_present", not missing, rules.sentinel_parks, missing or "all found")
+    )
+    park_stats = stats.get("parks", {})
+    for key in ("extract", "by_reason", "units", "validation"):
+        if key in park_stats:
+            checks.append(_info(f"parks.{key}", park_stats[key]))
+    disc = frames.get("park_discrepancies")
+    if disc is not None and len(disc):
+        for direction, label in (("a_only", "osm_only"), ("b_only", "reference_only")):
+            top = disc[disc["direction"] == direction].nlargest(10, "area_m2")
+            checks.append(
+                _info(
+                    f"parks.top_discrepancies_{label}",
+                    [
+                        {"name": n, "acres": round(float(a) / ACRE_M2, 1)}
+                        for n, a in zip(top["name"], top["area_m2"], strict=True)
+                    ],
+                )
+            )
+    return checks
+
+
 def run_validation(cfg: RegionConfig, frames: dict[str, Any], stats: dict[str, Any]) -> list[Check]:
     checks = _geometry_checks(frames)
     checks += _census_checks(cfg, frames["blocks"], frames["block_groups"])
     checks += _area_checks(cfg, frames)
     checks += _acs_checks(cfg, frames["block_groups"])
+    checks += _park_checks(cfg, frames, stats)
     checks.append(_info("process.stats", stats))
     return checks
 

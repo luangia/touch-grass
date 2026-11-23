@@ -25,6 +25,7 @@ import shapely
 
 from touchgrass.config import RegionConfig
 from touchgrass.config.models import AnalysisAreaSource
+from touchgrass.core import compare
 from touchgrass.core.assign import assign_points_to_areas, points_in_polygon
 from touchgrass.core.crs import STORAGE_EPSG
 from touchgrass.core.geometry import (
@@ -35,9 +36,10 @@ from touchgrass.core.geometry import (
     representative_points,
     to_multipolygon,
 )
+from touchgrass.core.parks import classify_candidates, merge_into_units, subtract_excluded
 from touchgrass.paths import RegionPaths
 from touchgrass.pipeline import sources as src
-from touchgrass.sources import acs, tiger
+from touchgrass.sources import acs, osm, tiger
 from touchgrass.sources.http import cached_manifest
 
 OUTPUT_FILES = {
@@ -46,6 +48,12 @@ OUTPUT_FILES = {
     "blocks": "blocks.parquet",
     "area_membership": "area_membership.parquet",
     "block_groups": "block_groups.parquet",
+}
+# Written only when the region configures `parks` (Stage 3).
+PARK_FILES = {
+    "green_candidates": "green_candidates.parquet",
+    "parks": "parks.parquet",
+    "park_discrepancies": "park_discrepancies.parquet",
 }
 STATS_FILE = "process_stats.json"
 
@@ -277,6 +285,80 @@ def build_block_groups(
     )
 
 
+def build_parks(
+    cfg: RegionConfig, paths: RegionPaths, buffer: Any, stats: dict[str, Any]
+) -> dict[str, Any]:
+    """OSM candidates → classified → merged units; optional comparison with a reference."""
+    rules = cfg.parks
+    osm_raw = src.osm_source(cfg, paths)
+    if rules is None or osm_raw is None:
+        return {}
+    candidates, extract = osm.extract_areas(_require(osm_raw), rules.candidate_tags(), buffer)
+    candidates = classify_candidates(candidates, rules, cfg.analysis_crs)
+    units = merge_into_units(candidates[candidates["included"]], cfg.analysis_crs)
+    holes = candidates[candidates["reason"].isin(rules.subtract_reasons)]
+    units, subtraction = subtract_excluded(units, holes, cfg.analysis_crs, rules.min_area_m2)
+
+    reasons = candidates.groupby("reason").agg(
+        candidates=("osm_id", "size"), km2=("area_m2", lambda a: round(a.sum() / 1e6, 3))
+    )
+    by_tag = candidates.groupby(["reason", "rule_tag"]).size()
+    stats["parks"] = {
+        "osm_snapshot": cfg.osm.snapshot if cfg.osm else None,
+        "extract": {
+            "areas_matched_in_extract": extract.areas_matched,
+            "areas_in_study_area": extract.areas_in_study_area,
+            "geometry_errors": extract.geometry_errors,
+            "candidate_area_relations_in_extract": extract.candidate_area_relations,
+            "broken_relations_in_extract": len(extract.broken_relations),
+            "broken_relation_ids_sample": extract.broken_relations[:20],
+        },
+        "by_reason": reasons.to_dict(orient="index"),
+        "by_reason_and_tag": {f"{r} | {t}": int(n) for (r, t), n in by_tag.items()},
+        "units": {
+            "count": len(units),
+            "by_class": units["park_class"].value_counts().to_dict(),
+            "total_km2": round(float(units["area_m2"].sum()) / 1e6, 3),
+            "merged_units": int((units["n_members"] > 1).sum()),
+        },
+        "subtraction": {"reasons": list(rules.subtract_reasons), **subtraction},
+    }
+
+    discrepancies = gpd.GeoDataFrame(
+        {"direction": [], "area_m2": [], "name": []}, geometry=[], crs=STORAGE_EPSG
+    )
+    ref_raw = src.park_validation_source(cfg, paths)
+    if ref_raw is not None:
+        ref, _ = clean_polygons(_read_geojson(_require(ref_raw)))
+        ref = ref[ref.geometry.intersects(buffer)]
+        a = shapely.intersection(shapely.union_all(units.geometry.values), buffer)
+        b = shapely.intersection(shapely.union_all(ref.geometry.values), buffer)
+        discrepancies = compare.discrepancy_pieces(a, b, cfg.analysis_crs)
+        discrepancies["name"] = _piece_names(discrepancies, units, ref)
+        stats["parks"]["validation"] = {
+            "reference_features_in_buffer": len(ref),
+            "area": compare.area_agreement(a, b, cfg.analysis_crs),
+            "osm_units_covered_by_reference": compare.feature_coverage(units, b, cfg.analysis_crs),
+            "reference_features_covered_by_osm": compare.feature_coverage(ref, a, cfg.analysis_crs),
+        }
+    return {"green_candidates": candidates, "parks": units, "park_discrepancies": discrepancies}
+
+
+def _piece_names(pieces: Any, units: Any, ref: Any) -> list[str | None]:
+    """Label each discrepancy piece with the name of the feature it came from."""
+    names: list[str | None] = []
+    ref_name_col = next((c for c in ("SITENAME", "NAME", "name") if c in ref.columns), None)
+    for direction, geom in zip(pieces["direction"], pieces.geometry, strict=True):
+        point = geom.representative_point()
+        if direction == "a_only":
+            hits = units[units.geometry.intersects(point)]
+            names.append(hits["name"].iloc[0] if len(hits) else None)
+        else:
+            hits = ref[ref.geometry.intersects(point)] if ref_name_col else ref.iloc[0:0]
+            names.append(str(hits[ref_name_col].iloc[0]) if len(hits) else None)
+    return names
+
+
 # ---------------------------------------------------------------------------- driver
 
 
@@ -298,6 +380,10 @@ def run_process(
     membership = build_membership(blocks, areas)
     progress("block groups + ACS")
     block_groups = build_block_groups(cfg, paths, blocks, stats)
+    buffer = boundary_gdf.loc[boundary_gdf["kind"] == "analysis_buffer", "geometry"].iloc[0]
+    if cfg.parks is not None:
+        progress("parks: OSM extract (one pass over the snapshot, ~1 min) + rules + ORCA")
+    park_frames = build_parks(cfg, paths, buffer, stats)
 
     frames = {
         "study_boundary": boundary_gdf,
@@ -305,6 +391,7 @@ def run_process(
         "blocks": blocks,
         "area_membership": membership,
         "block_groups": block_groups,
+        **park_frames,
     }
     write_outputs(frames, paths.processed)
     (paths.processed / STATS_FILE).write_text(
@@ -321,7 +408,7 @@ def load_stats(out_dir: Path) -> dict[str, Any]:
 def write_outputs(frames: dict[str, Any], out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     for name, frame in frames.items():
-        frame.to_parquet(out_dir / OUTPUT_FILES[name], index=False)
+        frame.to_parquet(out_dir / {**OUTPUT_FILES, **PARK_FILES}[name], index=False)
 
 
 def load_outputs(out_dir: Path) -> dict[str, Any]:
@@ -333,4 +420,7 @@ def load_outputs(out_dir: Path) -> dict[str, Any]:
         frames[name] = (
             pd.read_parquet(path) if name == "area_membership" else gpd.read_parquet(path)
         )
+    for name, filename in PARK_FILES.items():  # optional: only regions with `parks`
+        if (out_dir / filename).is_file():
+            frames[name] = gpd.read_parquet(out_dir / filename)
     return frames
