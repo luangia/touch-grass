@@ -16,7 +16,9 @@ uv sync                       # installs the exact versions in uv.lock
 uv run touchgrass regions validate portland-or
 uv run touchgrass fetch portland-or     # downloads ~480 MB once (cached afterwards)
 uv run touchgrass process portland-or   # offline: GeoParquet + validation report
-uv run pytest
+uv run touchgrass db migrate            # create/upgrade the PostGIS schema
+uv run touchgrass load portland-or      # load the region (one transaction; rerun-safe)
+uv run pytest                           # db tests use a throwaway touchgrass_test database
 ```
 
 Adding a city = adding `config/regions/<region-id>.yaml` (more fields arrive in Stages 2–3).

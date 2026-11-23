@@ -146,12 +146,21 @@ class OsmConfig(_StrictModel):
         return self.geofabrik_path.rsplit("/", 1)[-1]
 
 
+class TagVeto(_StrictModel):
+    """Overrules an include tag: a candidate with any ``tags`` match is excluded, unless it
+    also has an ``unless`` match. The value ``"*"`` matches any value of that key."""
+
+    tags: TagRule = Field(min_length=1)
+    unless: TagRule = Field(default_factory=dict)
+
+
 class ParksConfig(_StrictModel):
     """Rules deciding which OSM areas are public green space (DECISIONS.md D-018).
 
     Order of evaluation for each candidate area:
-      1. has an ``include_tags`` tag → excluded if ``access`` ∈ ``exclude_access``,
-         else included (class ``natural_area`` if it has a ``natural_area_tags`` tag);
+      1. has an ``include_tags`` tag → excluded if ``access`` ∈ ``exclude_access``, then
+         excluded by the first matching ``veto_tags`` group (D-018 amendment 2), else
+         included (class ``natural_area`` if it has a ``natural_area_tags`` tag);
       2. otherwise the first ``exclude_tags`` group whose tags match gives the reason;
       3. included candidates smaller than ``min_area_m2`` are excluded as too small;
       4. after merging, areas excluded for a ``subtract_reasons`` reason are cut out of
@@ -164,6 +173,11 @@ class ParksConfig(_StrictModel):
         description="Reason → tags. Matching candidates are recorded with that reason",
     )
     exclude_access: list[str] = Field(default_factory=lambda: ["private", "no"])
+    veto_tags: dict[Slug, TagVeto] = Field(
+        default_factory=dict,
+        description="Reason → veto. Overrules an include tag, e.g. a building or a heritage "
+        "site that OSM tags as a protected area",
+    )
     natural_area_tags: TagRule = Field(default_factory=dict)
     min_area_m2: float = Field(default=400, ge=0)
     validation_source: ArcGISLayerSource | None = Field(
@@ -184,6 +198,15 @@ class ParksConfig(_StrictModel):
         unknown = set(self.subtract_reasons) - set(self.exclude_tags)
         if unknown:
             raise ValueError(f"subtract_reasons {sorted(unknown)} are not exclude_tags reasons")
+        return self
+
+    @model_validator(mode="after")
+    def _veto_reasons_are_distinct(self) -> Self:
+        clash = set(self.veto_tags) & (
+            set(self.exclude_tags) | {"included", "too_small", "access_restricted"}
+        )
+        if clash:
+            raise ValueError(f"veto_tags reasons {sorted(clash)} clash with other reasons")
         return self
 
     @model_validator(mode="after")

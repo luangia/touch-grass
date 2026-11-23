@@ -39,6 +39,13 @@ RULES = ParksConfig.model_validate(
             "land_cover_not_a_park": {"landuse": ["grass", "forest"]},
             "amenity_usually_in_park_or_school": {"leisure": ["playground"]},
         },
+        "veto_tags": {
+            "building_not_open_space": {"tags": {"building": ["*"]}},
+            "heritage_site_not_park": {
+                "tags": {"protect_class": ["22"]},
+                "unless": {"leisure": ["park"]},
+            },
+        },
         "min_area_m2": 400,
         "sentinel_parks": ["Big Woods"],
     }
@@ -70,6 +77,18 @@ class TestClassify:
             ({"leisure": "playground"}, False, None, "amenity_usually_in_park_or_school"),
             # An include tag wins over an exclude tag on the same object.
             ({"leisure": "park", "landuse": "grass"}, True, "park", "included"),
+            # Vetoes overrule include tags; "*" matches any value.
+            ({"leisure": "dog_park", "building": "yes"}, False, None, "building_not_open_space"),
+            (
+                {"boundary": "protected_area", "protect_class": "22"},
+                False,
+                None,
+                "heritage_site_not_park",
+            ),
+            # ... unless the object is also a real park.
+            ({"leisure": "park", "protect_class": "22"}, True, "park", "included"),
+            # A veto never applies to something that wasn't included.
+            ({"building": "yes"}, False, None, "no_matching_rule"),
         ],
     )
     def test_rules(
@@ -77,6 +96,16 @@ class TestClassify:
     ) -> None:
         d = classify(tags, RULES)
         assert (d.included, d.park_class, d.reason) == (included, park_class, reason)
+
+    def test_veto_reason_must_not_clash(self) -> None:
+        with pytest.raises(ValueError, match="clash"):
+            ParksConfig.model_validate(
+                {
+                    "include_tags": {"leisure": ["park"]},
+                    "exclude_tags": {"not_open_space": {"leisure": ["golf_course"]}},
+                    "veto_tags": {"not_open_space": {"tags": {"building": ["*"]}}},
+                }
+            )
 
     def test_natural_tags_must_be_included(self) -> None:
         with pytest.raises(ValueError, match="not in include_tags"):

@@ -104,5 +104,5 @@ Each concept is taught with: **Intuition → Problem → Mechanics → Implement
 - [Stage 1 — Foundations, environment & region config](learning/stage-01-foundations.md) (implemented)
 - [Stage 2 — Boundaries & population data](learning/stage-02-boundaries-population.md) (implemented)
 - [Stage 3 — Parks & green space](learning/stage-03-parks-green-space.md) (implemented)
-- [Stage 4 — PostGIS database & spatial SQL](learning/stage-04-postgis-spatial-sql.md) (prepared)
+- [Stage 4 — PostGIS database & spatial SQL](learning/stage-04-postgis-spatial-sql.md) (implemented; measured plans in §14)
 - [Deep dive: Coordinate Reference Systems](learning/deep-dive-crs.md)

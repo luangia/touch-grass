@@ -297,3 +297,38 @@ TouchGrass is a public portfolio project, so clipping, reprojecting or overlayin
 - Effect on Portland: 1.51 km² removed from 2 units; 1 unit dropped (a 0.16-acre recreation ground inside Waverly Country Club). OSM-vs-ORCA precision 0.877 → **0.895**, recall unchanged at 0.931.
 - Gardens are deliberately **not** subtracted: e.g., the International Rose Test Garden inside Washington Park is free and public.
 
+**Amendment 2 (2026-11-23, approved "Yes, amend D-018"):** querying the loaded parks in Stage 4 (the nearest park to Pioneer Courthouse Square was the courthouse itself) showed that include tags alone let in buildings and heritage sites.
+- New `parks.veto_tags`: checked after the access rule, it overrules an include tag. Each veto is `tags` (any match) plus an optional `unless` (any match cancels the veto); the value `"*"` matches any value of a key.
+- Portland vetoes:
+  - `building_not_open_space`: `building=*`
+  - `heritage_site_not_park`: `protect_class=22` or `protection_title=protected_site`, unless the feature also has a park-type include tag (`leisure` park, nature_reserve, dog_park, common; `landuse` recreation_ground, village_green)
+- Before choosing these rules, I checked them against every included candidate. Exactly 4 features match: Pioneer Courthouse (`building=office`), Aubrey Watzek House and Fido's Indoor Dog Park (`building=yes`), and the US Government Moorings Historic District (`protect_class=22`).
+  - Willamette Stone State Heritage Site (`protect_class=22` + `leisure=park`) stays, via `unless`.
+  - Washington Park (`protect_class=5`, "City Park") is unaffected.
+- **Effect on Portland:** units 477 → 473, with no other unit changed; park area 73.57 → 73.50 km². OSM-vs-ORCA precision 0.8952 → **0.8961** (all 4 were OSM-only), recall unchanged at 0.9309. Sentinels still present.
+
+
+---
+
+## D-019 — PostGIS storage: loading, migrations, schema shape, test database
+
+**Status:** Accepted (2026-11-23, Stage 4 Q1–Q7, "Approve as recommended")
+
+**Decision:**
+
+| # | Choice |
+|---|---|
+| Q1 Loading | psycopg 3 **binary `COPY`** of WKB into temp staging tables, then `INSERT … SELECT ST_GeomFromWKB(wkb, 4326)`. A region is replaced in **one transaction**: `DELETE FROM regions` cascades to every table, then everything is re-inserted. `ANALYZE` afterwards. The loader re-runs Stage 2–3 validation first and refuses outputs that fail it. |
+| Q2 Migrations | Numbered plain SQL files plus a small runner (`touchgrass.db.migrate`). Each file runs in its own transaction under an advisory lock and is recorded with its SHA-256. An applied file whose checksum changed is refused. |
+| Q3 Metric queries | Store **EPSG:4326 only** (D-008). Metres come from `geography` casts or by transforming the *constant* side. Heavy metric analysis stays in Python. Expression indexes are left as an exercise. |
+| Q4 ACS | Long table `acs_estimates(region_id, geoid, variable, estimate, moe, vintage)` plus the view `acs_estimates_cv`. |
+| Q5 Scope | Load everything processed **except reports** (`park_discrepancies`, `validation.json`, `process_stats.json` stay as files). Provenance from raw manifests goes in `datasets`. |
+| Q6 Tests | A separate `<POSTGRES_DB>_test` database, created and dropped by the test session. Tests are marked `db` and skip when the server is unreachable. |
+| Q7 Settings | `DATABASE_URL` wins; otherwise `POSTGRES_*` environment variables, then the repo's `.env`, then localhost:5432 defaults. The password is never printed. |
+
+**Implementation detail decided during Stage 4:** the migration files live **inside the package** (`pipeline/src/touchgrass/db/migrations/`) rather than at the repo root as the lesson sketched. Shipping them with the code means an installed `touchgrass` always finds the schema it was written for.
+
+**Consequences:**
+- Every table's primary key starts with `region_id`, and every table cascades from `regions`. Reloading one region never touches another's rows, and a test checks this.
+- The column types enforce SRID 4326 and the geometry type. `CHECK` constraints restate the validation rules, e.g. `ST_IsValid`, non-negative counts, `included = (reason = 'included')`, `cardinality(member_ids) = n_members`.
+- The API (Stage 8) can connect read-only to the same schema. The pipeline stays the only writer.

@@ -250,3 +250,38 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 - Python: pyogrio's GDAL has **no PostgreSQL driver**; psycopg 3.3.8 (libpq 18, binary COPY), SQLAlchemy 2.1.8 and GeoAlchemy2 0.21.0 resolve under the date cutoff (checked in a throwaway env).
 
 **Created:** `docs/learning/stage-04-postgis-spatial-sql.md` (decisions Q1–Q7 pending).
+
+## 2026-11-23 — Stage 4 implemented: PostGIS schema, migrations, loader, exploration
+
+**Approval:** "Approve as recommended" (Q1–Q7, recorded as D-019).
+
+**Added**
+- `psycopg[binary]>=3.2` (resolved 3.3.8 under the D-014 cutoff).
+- `touchgrass/db/`: `connection.py` (settings), `migrate.py` (checksummed runner), `load.py` (staged binary COPY, one transaction, re-validation, provenance, digests), `migrations/0001–0004`.
+- CLI: `db migrate`, `db status`, `load <region>`.
+- `sql/explore/01–05` + README.
+- Tests: `test_db.py` (18, marker `db`; 2 also `data`), `test_db_settings.py` (4). Marker `db` registered.
+
+**Deviations from the lesson plan:** migrations live in the package instead of `db/migrations/` at the repo root; `area_membership` drops the redundant `area_type`.
+
+**Results (real data)**
+- Load: 63,817 rows / 9 tables, transaction 1.7 s; all geometry SRID 4326 and valid; population 652,503; reload digests identical.
+- Parity: SQL membership = GeoPandas membership, 24,785 = 24,785 pairs, 0 differences.
+- Plans: point-in-polygon join 25–31 ms with GiST vs 1,615–1,706 ms without (about 60×); polygon-vs-boundary 39× faster subdivided; points-in-boundary *slower* subdivided (prepared-geometry cache), so the lesson's §5.5 prediction was corrected; KNN 5 nearest parks in 4.9 ms / 31 buffers.
+
+**Problems hit**
+- An unmaterialized CTE inside `EXISTS` was inlined by PostgreSQL and re-ran `ST_Subdivide` per block. It was cancelled after more than 2 minutes and fixed with `AS MATERIALIZED` (documented in query 03).
+- I first wrote two wrong explanations in the lesson: a spurious "331 vs 480 blocks" difference (480 was pre-`DISTINCT` rows) and a guess about Pioneer Courthouse's tags. Both were checked against the data and corrected before finishing.
+- Test bug: read a non-spatial parquet with GeoPandas; switched to pandas.
+
+**Data finding:** 4 likely park false positives through `boundary=protected_area` heritage sites or `building=*` (lesson §14). Proposed a D-018 amendment; not applied.
+
+**Verification:** ruff and mypy --strict clean; 139 tests pass with the database up; with it unreachable, 122 pass and 17 skip cleanly; the hardcoding guard passes. Nothing committed.
+
+## 2026-11-23 — D-018 amendment 2: veto tags (approved "Yes, amend D-018")
+
+- `ParksConfig.veto_tags` (`TagVeto`: `tags` + `unless`; `"*"` wildcard) is applied after the access rule. A validator rejects veto reasons that clash with exclude reasons or the built-in ones.
+- Portland config: `building_not_open_space` and `heritage_site_not_park`. I checked the candidate set in PostGIS first, and exactly 4 features match.
+- Tests: +5 (4 rule cases, 1 clash validator). Total 144, all passing.
+- Reprocessed and validated (all hard checks pass), then reloaded: parks 477 → 473 with no other unit changed; precision 0.8952 → 0.8961, recall 0.9309 unchanged; load 63,813 rows.
+- Nothing committed.

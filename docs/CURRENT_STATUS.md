@@ -1,26 +1,26 @@
 # Current Status — TouchGrass
 
-_Last updated: 2026-11-22_
+_Last updated: 2026-11-23_
 
 ## Where we are
 
 | Item | Status |
 |---|---|
-| Phase | **Stages 1–3 complete. Stage 4 prepared**, awaiting implementation approval |
+| Phase | **Stages 1–3 complete. Stage 4 implemented, awaiting your review** |
 | Completed stages | 1: Foundations · 2: Boundaries & population · 3: Parks & green space (2026-11-23) |
-| Next stage | 4: PostGIS database & spatial SQL. Lesson: [stage-04-postgis-spatial-sql.md](learning/stage-04-postgis-spatial-sql.md). **Not approved for implementation**; decisions Q1–Q7 pending |
-| Code | `pipeline/`: config, CRS rules, adapters (ArcGIS, TIGER, ACS, OSM), spatial core, parks, fetch/process/validate CLI; 117 tests |
-| Database | PostGIS 3.6.4 running again (container recreated 2026-11-23 on the existing volume); no project tables yet |
-| Git | `main`, 2 commits ahead of `origin` (Stage 3 planning + Stage 3) |
+| Current stage | 4: PostGIS database & spatial SQL. [Lesson](learning/stage-04-postgis-spatial-sql.md) §13 (built) and §14 (measured plans) |
+| Code | `pipeline/`: config, CRS rules, adapters, spatial core, parks, fetch/process/validate, **db migrate/status, load**; 144 tests (27 new, `db`-marked tests skip without a database) |
+| Database | PostGIS 3.6.4; schema `touchgrass` at migration 0004; **portland-or loaded** (63,813 rows, after the D-018 amendment 2 reprocess) |
+| Git | `main`, 2 commits ahead of `origin`. **Stage 4 prep and implementation are uncommitted** |
 
 ## Currently being worked on
 
-- Stage 4 preparation done. Waiting on decisions Q1–Q7 and implementation approval.
+- Stage 4 review. The park false positives found while querying are **fixed** (D-018 amendment 2: `veto_tags`; 477 → 473 units).
 - ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
 
-See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff). Stage 2 added D-015 (data-source choices) and amended D-007 (Census interior points). Stage 3 added D-017 (dated OSM extracts + pyosmium; uv-managed Python) and D-018 (park rules and merging).
+See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff). Stage 2 added D-015 (data-source choices) and amended D-007 (Census interior points). Stage 3 added D-017 (dated OSM extracts + pyosmium; uv-managed Python) and D-018 (park rules and merging; amendment 2 adds `veto_tags`). Stage 4 added D-019 (COPY loading, SQL migrations, 4326-only storage, long ACS table, test database, settings).
 
 ## How to run what exists
 
@@ -28,13 +28,16 @@ See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 block
 cd pipeline
 uv run touchgrass fetch portland-or      # ~480 MB streamed once, then cached
 uv run touchgrass process portland-or    # offline; writes data/processed/portland-or/
-uv run pytest                            # add -m data for real-data checks only
+uv run touchgrass db migrate             # schema (needs `docker compose up -d db`)
+uv run touchgrass load portland-or       # ~2 s; replaces the region atomically
+uv run pytest                            # -m data / -m db to select; db tests use touchgrass_test
 ```
 
 ## Next steps
 
-1. Answer Stage 4 decisions Q1–Q7 (lesson §9).
-2. Approve implementation: `/learn:implement-stage 4`.
+1. Review Stage 4 (`/learn:stage-review 4` or `/learn:review`).
+2. Commit when you're happy (nothing is committed yet).
+3. Then `/learn:advance` to prepare Stage 5 (walk network).
 
 ## Blockers / risks being watched
 
@@ -54,13 +57,14 @@ uv run pytest                            # add -m data for real-data checks only
 Target bullets (pending implementation):
 - ☐ Built a reproducible geospatial ETL pipeline ingesting US Census (2020 blocks, ACS 5-year), TIGER/Line, and OpenStreetMap data with provenance tracking and automated validation. _(Stages 2–3)_
 - ☐ Computed pedestrian-network walking distance from ~N census blocks to nearest park access points using multi-source Dijkstra over an OSM walk graph, contrasting it with straight-line distance (median detour ratio X). _(Stages 5–6)_
-- ☐ Designed a multi-region PostGIS schema with GiST-indexed spatial joins, measuring an X× speedup via `EXPLAIN ANALYZE`. _(Stage 4)_
+- ☐ Designed a multi-region PostGIS schema with GiST-indexed spatial joins, measuring an X× speedup via `EXPLAIN ANALYZE`. _(Stage 4; measured about 60×, finalize after review)_
 - ☐ Produced population-weighted 5/10/15-minute park-access metrics for ~95 Portland neighborhoods, identifying X residents beyond a 10-minute walk. _(Stage 7)_
 - ☐ Delivered a typed FastAPI service (GeoJSON + PostGIS-generated vector tiles) and a React/MapLibre interactive map for neighborhood comparison. _(Stages 8–10)_
 - ☐ Architected configuration-driven region onboarding so new cities require only a YAML config and data sources. _(Stages 1–2)_
 
 Completed so far:
 - Project planning and architecture design.
+- Stage 4 (implemented, awaiting review): multi-region PostGIS schema with checksummed SQL migrations, typed SRID columns and constraints; atomic binary-COPY loader (63,817 rows in 1.7 s); PostGIS and GeoPandas membership agree exactly (24,785 pairs); GiST point-in-polygon join about 60× faster than without the index, measured with `EXPLAIN ANALYZE`.
 - Stage 3: OSM park extraction from a checksummed snapshot with config-driven classification rules; overlapping features merged with union-find; validated against Metro ORCA (area precision 0.90, recall 0.93), with the 20 largest disagreements explained.
 - Stage 2: reproducible Census/TIGER/ArcGIS ETL; population reconciles exactly to the official 2020 total (652,503) and to all 4 council districts; overlapping-neighborhood membership model; 92 tests.
 - Stage 1: config-driven region model with validated CRS rules (projected, metric, non-Mercator, area-of-use check), a Typer CLI, a 55-test suite, and a containerised PostGIS environment. *Foundation only, not yet resume-worthy on its own.*

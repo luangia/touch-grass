@@ -408,3 +408,11 @@ Method: for each piece, a live lookup of what **all** ORCA categories say at tha
 **Not subtracted, on purpose:** gardens. Several sit inside parks and are free and public (International Rose Test Garden, Peninsula Park Rose Garden), so cutting them out would be wrong.
 
 **Tests added:** cut, drop and untouched cases; an unknown reason is rejected by config validation; an end-to-end zoo-inside-reserve case that becomes a polygon hole. 117 tests pass; outputs remain byte-identical on rerun.
+
+## Later amendment (Stage 4, 2026-11-23): veto tags
+
+Querying the loaded parks in PostGIS showed that include tags alone let in **buildings and heritage sites**: OSM tags some historic buildings `boundary=protected_area`. `parks.veto_tags` now overrules an include tag (D-018 amendment 2):
+- **`building=*`** is excluded.
+- **`protect_class=22` / `protection_title=protected_site`** is excluded unless the feature is also a park by its own tags.
+
+This removed 4 units, Pioneer Courthouse among them. See the [Stage 4 lesson §14](stage-04-postgis-spatial-sql.md), query 04.

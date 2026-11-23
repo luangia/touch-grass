@@ -65,52 +65,35 @@ TouchGrass is a classic **batch-analysis + read-only serving** GIS system. The e
 
 ## 4. Database design
 
-Single schema, every region-scoped table carries `region_id` (D-004).
+**Built in Stage 4** (D-019). Schema `touchgrass`; migrations in `pipeline/src/touchgrass/db/migrations/0001–0004`. Every table carries `region_id`, its primary key starts with it, and it cascades from `regions` (D-004). Geometry is stored in EPSG:4326 only (D-008), enforced by typed columns.
 
 ```
-regions(region_id PK text, name, analysis_crs int, bbox geometry(Polygon,4326),
-        config jsonb, created_at)
-
-datasets(dataset_id PK, region_id FK, source_name, url, license, retrieved_at,
-         sha256, vintage)                                -- provenance for every input
-
-analysis_runs(run_id PK, region_id FK, started_at, params jsonb,
-              code_version text, status)                 -- params: speed, thresholds, ...
-
-study_boundaries(region_id PK/FK, geom geometry(MultiPolygon,4326),
-                 buffer_geom geometry(MultiPolygon,4326))
-
-analysis_areas(area_id PK, region_id FK, area_type text, source_key text,
-               name text, geom geometry(MultiPolygon,4326))
-               UNIQUE(region_id, area_type, source_key)  -- neighborhoods, tracts, ...
-
-census_blocks(geoid20 PK char(15), region_id FK, pop_total int, housing_units int,
-              geom geometry(MultiPolygon,4326), rep_point geometry(Point,4326))
-
-block_groups(geoid PK char(12), region_id FK, acs_vintage text,
-             median_hh_income int, median_hh_income_moe int, ... ,
-             geom geometry(MultiPolygon,4326))
-
-area_membership(area_id FK, geoid20 FK, weight real DEFAULT 1, PK(area_id, geoid20))
-
-parks(park_id PK, region_id FK, source text, source_id text, name text,
-      park_class text, area_m2 double, is_public bool, tags jsonb,
-      geom geometry(MultiPolygon,4326))
-
-park_access_points(access_id PK, park_id FK, region_id FK, method text,  -- entrance|crossing|sampled
-                   osm_node_id bigint, geom geometry(Point,4326))
-
-block_access(run_id FK, geoid20 FK, nearest_park_id FK,
-             network_dist_m real, euclid_dist_m real, snap_dist_m real,
-             PK(run_id, geoid20))
-
-area_metrics(run_id FK, area_id FK, threshold_min int, pop_total int,
-             pop_within int, pct_within real, median_network_dist_m real,
-             park_area_m2 real, park_m2_per_resident real,
-             PK(run_id, area_id, threshold_min))
+regions          (region_id PK, name, analysis_crs, config jsonb, loaded_at)
+datasets         (region_id, source_id, url, stored_file, stored_bytes, sha256, retrieved_at,
+                  vintage, attribution, params jsonb)                PK (region_id, source_id)
+study_boundaries (region_id PK, buffer_m, boundary MultiPolygon, analysis_buffer MultiPolygon)
+analysis_areas   (region_id, area_id, area_type, source_key, name, check_population,
+                  geom MultiPolygon)                                 PK (region_id, area_id)
+census_blocks    (region_id, geoid20, county_fips, pop20, housing20, aland20, awater20, area_m2,
+                  frac_in_boundary, rep_point Point, rep_point_source, geom MultiPolygon)
+                                                                     PK (region_id, geoid20)
+area_membership  (region_id, area_id, geoid20)  PK all three; FKs → analysis_areas, census_blocks
+block_groups     (region_id, geoid, geom MultiPolygon)               PK (region_id, geoid)
+acs_estimates    (region_id, geoid, variable, estimate, moe, vintage)
+                                       PK (region_id, geoid, variable); FK → block_groups
+  view acs_estimates_cv                adds cv = (moe / 1.645) / estimate
+green_candidates (region_id, osm_type, osm_id, name, tags jsonb, included, park_class, reason,
+                  rule_tag, area_m2, geom MultiPolygon)              PK (region_id, osm_type, osm_id)
+parks            (region_id, park_id, name, park_class, area_m2, subtracted_m2, n_members,
+                  member_ids text[], member_names, geom MultiPolygon) PK (region_id, park_id)
+schema_migrations(version PK, filename, sha256, applied_at)          written by the runner
 ```
 
-**Indexes:** GiST on every `geom` column; B-tree on `(region_id)` and `(region_id, area_type)`. Spatial joins in loading (block ↔ area) use `ST_Intersects` + `ST_PointOnSurface`, verified with `EXPLAIN ANALYZE` in Stage 4.
+**Indexes:** GiST on every geometry column (plus `census_blocks.rep_point`); B-tree on `analysis_areas (region_id, area_type)`, `area_membership (region_id, geoid20)` and `green_candidates (region_id, reason)`.
+
+**Loading:** `touchgrass load <region>` re-validates the processed outputs, then in one transaction deletes the region (cascade), binary-`COPY`s each table into a temp staging table, and inserts with SQL conversions (WKB → geometry, lon/lat → Point, text → jsonb / text[]). `ANALYZE` runs after commit.
+
+**Planned for later stages** (not built yet): `analysis_runs`, `park_access_points`, `block_access` and `area_metrics` (Stages 5–7), each following the same `region_id` conventions.
 
 **Why not store the walk graph in PostGIS?** We traverse it in Python (NetworkX). Persisting it as GraphML/GeoPackage in `data/processed/` is simpler. Edges may optionally be loaded for display later (pgRouting is a future option).
 

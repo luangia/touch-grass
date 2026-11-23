@@ -39,10 +39,14 @@ class Decision:
     rule_tag: str  # the key=value that decided
 
 
+ANY_VALUE = "*"
+
+
 def _first_match(tags: dict[str, str], rule: TagRule) -> str | None:
     for key, values in rule.items():
-        if tags.get(key) in values:
-            return f"{key}={tags[key]}"
+        value = tags.get(key)
+        if value is not None and (value in values or ANY_VALUE in values):
+            return f"{key}={value}"
     return None
 
 
@@ -52,6 +56,10 @@ def classify(tags: dict[str, str], rules: ParksConfig) -> Decision:
     if included_by is not None:
         if tags.get("access") in rules.exclude_access:
             return Decision(False, None, ACCESS, f"access={tags['access']}")
+        for reason, veto in rules.veto_tags.items():
+            vetoed_by = _first_match(tags, veto.tags)
+            if vetoed_by is not None and _first_match(tags, veto.unless) is None:
+                return Decision(False, None, reason, vetoed_by)
         natural = _first_match(tags, rules.natural_area_tags) is not None
         return Decision(True, "natural_area" if natural else "park", INCLUDED, included_by)
     for reason, rule in rules.exclude_tags.items():

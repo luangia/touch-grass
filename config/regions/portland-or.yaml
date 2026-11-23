@@ -96,6 +96,20 @@ parks:
     garden_fee_membership_or_private:
       leisure: [garden]
   exclude_access: [private, "no"]
+  # Overrule an include tag (D-018 amendment 2). Found while querying PostGIS in Stage 4:
+  # Pioneer Courthouse and Aubrey Watzek House are buildings, and the US Government Moorings
+  # Historic District is a heritage site; OSM tags all three boundary=protected_area.
+  veto_tags:
+    building_not_open_space: # indoor or built, e.g. Fido's Indoor Dog Park
+      tags:
+        building: ["*"]
+    heritage_site_not_park: # protected for history, not as green space
+      tags:
+        protect_class: ["22"]
+        protection_title: [protected_site]
+      unless: # a real park that is also historic (e.g. Willamette Stone State Heritage Site)
+        leisure: [park, nature_reserve, dog_park, common]
+        landuse: [recreation_ground, village_green]
   # Cut these out of park outlines that enclose them (D-018 amendment): e.g. the Heron
   # Lakes golf courses inside Delta Park West, the zoo inside Washington Park.
   subtract_reasons: [not_open_space]

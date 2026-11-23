@@ -10,7 +10,10 @@ Stage 2 commands:
   touchgrass process <region-id>               raw → GeoParquet + validation (offline)
   touchgrass validate <region-id>              re-check existing processed outputs
 
-Later stages add commands (load, analyze) to the same ``app``.
+Stage 4 commands (PostGIS; settings from $DATABASE_URL or the repo's .env):
+  touchgrass db migrate                        create/upgrade the schema
+  touchgrass db status                         migrations + row counts per region
+  touchgrass load <region-id>                  replace a region's rows, one transaction
 """
 
 from __future__ import annotations
@@ -18,10 +21,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated
 
+import psycopg
 import typer
 
 from touchgrass import __version__
 from touchgrass.config import ConfigError, RegionConfig, find_config_dir, list_regions, load_region
+from touchgrass.db import connection as dbconn
+from touchgrass.db import migrate as dbmigrate
+from touchgrass.db.load import LoadError, row_counts
+from touchgrass.db.load import load_region as db_load_region
 from touchgrass.paths import RegionPaths, resolve_data_dir
 from touchgrass.pipeline.fetch import run_fetch
 from touchgrass.pipeline.process import MissingDataError, load_outputs, load_stats, run_process
@@ -32,6 +40,8 @@ app = typer.Typer(
 )
 regions_app = typer.Typer(help="Inspect and validate region configs.", no_args_is_help=True)
 app.add_typer(regions_app, name="regions")
+db_app = typer.Typer(help="PostGIS schema: migrations and status.", no_args_is_help=True)
+app.add_typer(db_app, name="db")
 
 ConfigDirOption = Annotated[
     Path | None,
@@ -212,3 +222,74 @@ def validate_cmd(
         typer.secho(f"✗ {err}", fg="red", err=True)
         raise typer.Exit(code=1) from err
     _report(cfg, run_validation(cfg, frames, load_stats(paths.processed)), paths.processed)
+
+
+# ------------------------------------------------------------------ Stage 4: database
+
+
+def _db_connect() -> psycopg.Connection[tuple[object, ...]]:
+    try:
+        settings = dbconn.load_settings()
+        return dbconn.connect(settings, autocommit=True)
+    except dbconn.DatabaseUnavailableError as err:
+        typer.secho(f"✗ {err}", fg="red", err=True)
+        raise typer.Exit(code=1) from err
+
+
+@db_app.command("migrate")
+def db_migrate_cmd() -> None:
+    """Apply pending schema migrations (each in its own transaction)."""
+    with _db_connect() as conn:
+        try:
+            applied = dbmigrate.migrate(conn)
+        except dbmigrate.MigrationError as err:
+            typer.secho(f"✗ {err}", fg="red", err=True)
+            raise typer.Exit(code=1) from err
+    for m in applied:
+        typer.secho(f"✓ applied {m.filename}", fg="green")
+    typer.echo("schema is up to date" if not applied else f"{len(applied)} migration(s) applied")
+
+
+@db_app.command("status")
+def db_status_cmd() -> None:
+    """Show applied/pending migrations and row counts per loaded region."""
+    with _db_connect() as conn:
+        typer.echo(f"database: {dbconn.load_settings().describe()}")
+        try:
+            states = dbmigrate.status(conn)
+        except dbmigrate.MigrationError as err:
+            typer.secho(f"✗ {err}", fg="red", err=True)
+            raise typer.Exit(code=1) from err
+        for s in states:
+            when = f"applied {s.applied_at:%Y-%m-%d %H:%M}" if s.applied_at else "PENDING"
+            typer.echo(f"  {s.migration.filename:<24} {when}")
+        if not all(s.applied for s in states):
+            typer.echo("run `touchgrass db migrate` to apply pending migrations")
+            return
+        counts = row_counts(conn)
+    if not counts:
+        typer.echo("no regions loaded")
+    for region_id, tables in sorted(counts.items()):
+        typer.echo(f"\n{region_id}")
+        for table, n in tables.items():
+            typer.echo(f"  {table:<18} {n:>9,}")
+
+
+@app.command("load")
+def load_cmd(
+    region: Annotated[str, typer.Argument(help="Region id.")],
+    config_dir: ConfigDirOption = None,
+    data_dir: DataDirOption = None,
+) -> None:
+    """Load a region's processed outputs into PostGIS, replacing its previous rows."""
+    cfg, paths = _region_and_paths(region, config_dir, data_dir)
+    with _db_connect() as conn:
+        try:
+            result = db_load_region(conn, cfg, paths, progress=lambda m: typer.echo(f"→ {m}"))
+        except (LoadError, MissingDataError, dbmigrate.MigrationError) as err:
+            typer.secho(f"✗ {err}", fg="red", err=True)
+            raise typer.Exit(code=1) from err
+    total = sum(result.rows.values())
+    typer.secho(
+        f"\nloaded {cfg.region_id}: {total:,} rows in {len(result.rows)} tables", fg="green"
+    )
