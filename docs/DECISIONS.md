@@ -63,7 +63,7 @@ All decisions D-001…D-012 were **Accepted** by the project owner on 2026-11-22
 
 **Options.**
 1. **OSM** (`leisure=park`, `leisure=nature_reserve`, etc.). Same source and code path for every future city; also provides entrances and the walk network. Quality varies by city (Portland's is high — Metro's RLIS was historically imported into OSM). Classification is tag-based and needs careful rules.
-2. **Metro ORCA** (Outdoor Recreation and Conservation Areas) or **City of Portland park boundaries**. Authoritative, includes ownership/access attributes. Portland-only; each future city needs a new adapter. License for ORCA must be confirmed (RLIS Discovery open-data terms appear to be ODbL/DbCL-based — to be verified in Stage 3).
+2. **Metro ORCA** (Outdoor Recreation and Conservation Areas) or **City of Portland park boundaries**. Authoritative, includes ownership/access attributes. Portland-only; each future city needs a new adapter. Licence: the RLIS Open Database EULA (verified 2026-11-22). It is attribution-style and states compatibility with CC BY 4.0 / ODC-By, *not* ODbL share-alike as first assumed.
 
 **Decision (recommended).** OSM as the **primary** source (portable), with a pluggable "park source adapter" so a region *can* use an authoritative layer. In Stage 3, **quantitatively compare** OSM parks against ORCA/City parks (area overlap, missing/extra parks) and document the result.
 
@@ -222,3 +222,25 @@ Context and evidence: `docs/learning/stage-02-boundaries-population.md` §4 and 
 | Q4 | ACS 2020–2024 tables: B01003, B19013, B03002, B25044. Age (B01001, 191 MB) deferred |
 | Q5 | Census data from key-free bulk files (TIGER/Line, ACS table-based summary file), not the Census API (which now requires a key) |
 | Q6 | Block representative point = Census internal point, checked inside its polygon (amends D-007) |
+
+---
+
+## D-016 — Trust for Public Land ParkServe: do not ingest; cite published figures only
+
+**Status:** Accepted (2026-11-23): Option 1, with Option 2 in progress. The project owner emailed TPL a consent request on 2026-11-23 (Portland only; comparison statistics and maps with attribution; no redistribution). **Awaiting a response.** If consent arrives, record its exact conditions here and in ARCHITECTURE §9 before using any ParkServe data. Until then, Option 1 applies.
+
+**Context.** The planning docs listed ParkServe's 10-minute-walk service areas as an external benchmark to download and compare against (ARCHITECTURE §9). The ParkServe Terms of Use (May 2023; verified 2026-11-22) reserve all rights:
+- One copy may be downloaded for **personal, non-commercial use**.
+- Downloaded materials may **not be modified, used for public display, or transferred** without TPL's prior written consent.
+- ParkServe also contains OSM data (ODbL) and Esri material.
+
+TouchGrass is a public portfolio project, so clipping, reprojecting or overlaying ParkServe polygons, or publishing maps or numbers derived from them, would need written consent. (This is a reading of the terms, not legal advice.)
+
+**Options.**
+1. **Don't ingest ParkServe at all; cite TPL's own published Portland figures** (e.g., their headline 10-minute-walk share) as a sanity benchmark, with attribution and a link. A cited fact isn't a redistribution of their data.
+2. **Ask TPL for written consent** to use the downloads for a public, non-commercial comparison. Highest-quality benchmark, but it's an external dependency with an unknown response time.
+3. Drop the benchmark entirely.
+
+**Recommendation.** Option 1 now. Option 2 is optional and can run in parallel (you'd send the request; I'd only draft it). Our own validation doesn't depend on ParkServe: it rests on OSM-vs-ORCA comparison, invariants, and independent route checks (Stages 3 and 6).
+
+**Consequences.** No ParkServe adapter, no ParkServe files in `data/`, and no ParkServe geometry in the app. The Stage 6 comparison becomes "our share vs TPL's published share", with the method differences explained (TPL uses half-mile walkable service areas from park access points).

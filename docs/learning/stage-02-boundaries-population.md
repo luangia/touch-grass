@@ -438,7 +438,7 @@ process (offline; every raw file re-verified against its manifest checksum)
 
 ### Known limitations
 - **Block populations are 2020 counts** with privacy noise; growth since 2020 is invisible (D-002).
-- **Metro RLIS licence** for the City Boundaries layer still needs a manual read (its page needs JavaScript).
+- ~~Metro RLIS licence still needs a manual read~~ **Resolved 2026-11-22:** the RLIS Open Database EULA (PDF provided by the project owner) is attribution-style (CC BY 4.0 / ODC-By compatible). Its required attribution statement is now the `attribution` of the boundary source in `portland-or.yaml`.
 - **ACS estimates are attached to block groups but not yet aggregated** to neighborhoods. MOE propagation happens in Stage 7.
 - **The interior-point rule assigns each block wholly to one side** of a boundary. That's fine at Portland's scale (≥ 10%-overlap exclusions total 401 people, 0.06%), but a city whose official boundary cut through many populated blocks would need area-weighted allocation.
 - **The statewide TIGER zip (287 MB) is re-read on every `process`.** GDAL filters while reading, so memory stays small, but a future optimisation could cache the county subset.

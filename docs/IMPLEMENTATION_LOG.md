@@ -140,3 +140,39 @@ Wrote `docs/learning/deep-dive-crs.md`. All numbers came from experiments run in
 **Licences:** City layers verified (public use, City Data Distribution Policy, "as is"). The Metro RLIS terms page is JavaScript-rendered: **still to verify manually**.
 
 **Not done (by design):** no PostGIS loading (Stage 4), parks (Stage 3), network (Stage 5). Nothing committed.
+
+---
+
+## 2026-11-22 — Metro RLIS licence verified
+
+**Source:** RLIS Open Database End User License Agreement, dated 2023-02-01 (PDF supplied by the project owner: `https://www.oregonmetro.gov/sites/default/files/2025-10/rlis-open-database-end-user-license-agreement-20230201.pdf`, retrieved 2026-11-22, 3 pages, SHA-256 `dbdead62d5e05718bab336fbcbe54a822a8a75171c9f177b53e70ba37926f7fd`).
+
+**Terms that matter for TouchGrass:**
+- **Allowed:** a royalty-free, non-exclusive, revocable licence to copy, publish, distribute, extract, modify, adapt, and combine the data in our own product.
+- **Required:** follow the licence, and show Metro's attribution statement with a link to the licence. Where listing many attributions isn't practical, a link to a page that lists them is acceptable.
+- **Forbidden:** sublicensing; implying official status or Metro endorsement; adding restrictions on the data. We may license our own derivative works on our own terms.
+- **Disclaimers:** "as is", no warranty, and an indemnity (hold-harmless) clause in Metro's favour. Oregon law; venue Multnomah County.
+- **Compatibility:** stated compatible with CC BY 4.0 and ODC-By, so it's attribution-only, **not** ODbL share-alike (correcting the planning assumption in D-003 and ARCHITECTURE §9).
+
+**Applied:** the boundary source `attribution` in `portland-or.yaml` now carries the required statement + licence URL; README attribution, ARCHITECTURE §9 (City Boundaries and ORCA rows), D-003, status and the Stage 2 lesson updated. The same terms will apply to ORCA in Stage 3.
+
+**Note:** the existing raw manifest for `study_boundary` still records the old attribution text (it was written at download time); the next `fetch --refresh` will rewrite it. Processing doesn't read the attribution, so outputs are unaffected.
+
+---
+
+## 2026-11-22 — ParkServe terms of use verified
+
+**Source:** "Legal Disclosure & Terms of Use", ParkServe, © 2023 The Trust for Public Land (PDF supplied by the project owner: `https://parkserve.tpl.org/downloads/ParkServe_Terms_of_Use_May_2023.pdf`, retrieved 2026-11-22, 1 page, SHA-256 `8a3328c7982527551d1685bf2f36a1589b29915e55a34cd8f19d04dac05bf6ae`).
+
+**Terms:**
+- All rights reserved. No copying, modifying, publishing or distributing without TPL's prior written consent.
+- Exception: one copy may be downloaded for personal, non-commercial use, but not modified, used commercially or for public display, or transferred.
+- Contains OSM data (ODbL) and Esri material. Provided "as is".
+
+**Impact:** this conflicts with the planned use of ParkServe as a downloaded benchmark in a public project. ARCHITECTURE §9 updated (not ingested); **D-016 proposed** (cite TPL's published figures instead; optionally request consent). Nothing was ever downloaded from ParkServe, so there's nothing to remove.
+
+---
+
+## 2026-11-23 — D-016 accepted; ParkServe consent requested
+
+The project owner accepted D-016 (cite TPL's published Portland figures; don't ingest ParkServe) and sent TPL a written-consent request for a limited, Portland-only comparison. Status: awaiting a response. No ParkServe data has been downloaded or used.

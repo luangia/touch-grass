@@ -56,4 +56,4 @@ Python · GeoPandas · Shapely · PyProj · OSMnx · NetworkX · PostgreSQL/Post
 
 ## Data attribution (planned)
 
-© OpenStreetMap contributors (ODbL) · U.S. Census Bureau (public domain) · City of Portland and Oregon Metro RLIS (terms to be confirmed).
+© OpenStreetMap contributors (ODbL) · U.S. Census Bureau (public domain) · City of Portland (Data Distribution Policy) · Regional Land Information System data are a product of Metro and made publicly available according to the license agreement found in [https://rlisdiscovery.oregonmetro.gov/pages/open-database-license](https://rlisdiscovery.oregonmetro.gov/pages/open-database-license).

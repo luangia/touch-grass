@@ -36,12 +36,12 @@ uv run pytest                            # add -m data for real-data checks only
 
 1. Review Stage 2 (`data/processed/portland-or/validation.json` is the best place to start).
 2. Decide on committing.
-3. Manually confirm the Metro RLIS licence terms for the City Boundaries layer.
-4. When ready: `/learn:advance` to prepare Stage 3.
+3. When ready: `/learn:advance` to prepare Stage 3.
 
 ## Blockers / risks being watched
 
-- License texts for City of Portland layers, Metro ORCA, and ParkServe not yet confirmed (marked **[verify]**). The City/Metro ones are a Stage 2 acceptance item.
+- City of Portland and Metro RLIS licences verified (2026-11-22).
+- ParkServe terms verified and **restrictive** (personal, non-commercial use only; no modification or public display without consent). D-016 accepted: don't ingest; cite TPL's published figures. A consent request was emailed to TPL on 2026-11-23, **awaiting a response**. Don't use ParkServe data unless written consent arrives.
 - The Census Data API now requires a key; Stage 2 plans to use key-free bulk files instead.
 - Schedule is at the top of the 1–2 week range; deferral order is in PROJECT_PLAN §3.
 

@@ -32,7 +32,9 @@ study_boundary:
   adapter: arcgis_feature_layer
   url: https://www.portlandmaps.com/od/rest/services/COP_OpenData_Boundary/MapServer/10
   where: "CITYNAME = 'Portland'"
-  attribution: Metro Data Resource Center (RLIS), via City of Portland Open Data
+  # RLIS Open Database EULA (2023-02-01) requires this statement + a link to the licence.
+  attribution: >-
+    Regional Land Information System data are a product of Metro and made publicly available according to the license agreement found in https://rlisdiscovery.oregonmetro.gov/pages/open-database-license
 
 analysis_areas:
   # One polygon per neighborhood association; shared areas overlap (D-015 Q1).
