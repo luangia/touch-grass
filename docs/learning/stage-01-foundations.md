@@ -112,7 +112,7 @@ dist_ns_deg = 0.01   # really ≈ 1,110 m
 - A 10-acre park would measure as 20 acres.
 - MapLibre still *displays* in Web Mercator, which is fine because display isn't measurement.
 
-**Datums: NAD83 vs WGS 84.** They began nearly identical. Because NAD83 is fixed to the North American plate, they now differ by about 1–2 m in Oregon. That's irrelevant at our analysis scale, but it's why transformations between them exist, and why we always transform rather than "relabel".
+**Datums: NAD83 vs WGS 84.** They began nearly identical. Because NAD83 is fixed to the North American plate, they now differ by about 1–2 m in Oregon. That's irrelevant at our analysis scale. *Correction from the [CRS deep dive](deep-dive-crs.md) §3.2:* PROJ's default WGS 84 ↔ NAD83 step is itself a zero-shift transformation with a declared 4 m accuracy, so in practice it *is* a relabel. It's acceptable here because the shift is near-uniform across a city and our measurements are relative.
 
 ### 4.5 How PyProj works underneath
 
