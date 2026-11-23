@@ -8,7 +8,8 @@ Detailed, stage-by-stage technical lessons.
 | 2 | [Boundaries & population data](stage-02-boundaries-population.md) — census geography and GEOIDs, decennial vs ACS, MOE, differential privacy, TIGER, ArcGIS REST, GeoPandas internals, spatial joins, reproducible ETL | Implemented (2026-11-22) |
 | 3 | [Parks & green space](stage-03-parks-green-space.md) — OSM data model and PBF streaming, reproducible snapshots, tag classification, overlap merging as a graph problem, area precision/recall against ORCA | Implemented (2026-11-23) |
 | 4 | [PostGIS database & spatial SQL](stage-04-postgis-spatial-sql.md) — geometry vs geography, SRID typmods, GiST/R-tree internals, filter-and-refine, reading query plans, multi-region schema, migrations, COPY loading; measured plans (§14) | Complete |
-| 5 | [Pedestrian network & park access points](stage-05-walk-network-access-points.md) — graphs and simplification, the OSMnx walk filter and its biases, connected components, KD-trees/R-trees, edge snapping with offsets, virtual-source Dijkstra, access points; results (§14) | Implemented, awaiting review |
+| 5 | [Pedestrian network & park access points](stage-05-walk-network-access-points.md) — graphs and simplification, the OSMnx walk filter and its biases, connected components, KD-trees/R-trees, edge snapping with offsets, virtual-source Dijkstra, access points; results (§14), field check (§16) | Complete |
+| 6 | [Walking accessibility analysis](stage-06-walking-accessibility.md) — Dijkstra and priority queues, the virtual source, block distances incl. the same-edge case, cutoffs, detour index, invariants, reproducible runs | Prepared, not implemented |
 
 ## Deep dives
 

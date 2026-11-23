@@ -6,16 +6,16 @@ _Last updated: 2026-11-23_
 
 | Item | Status |
 |---|---|
-| Phase | **Stages 1–4 complete. Stage 5 implemented, awaiting your review** |
-| Completed stages | 1: Foundations · 2: Boundaries & population · 3: Parks & green space · 4: PostGIS & spatial SQL (2026-11-23) |
-| Current stage | 5: Pedestrian network & park access points. [Lesson](learning/stage-05-walk-network-access-points.md) §13 (built), §14 (results) |
-| Code | `pipeline/`: … + `touchgrass network` (walk graph, block origins, park access points); 182 tests |
+| Phase | **Stages 1–5 complete. Stage 6 prepared**, awaiting implementation approval |
+| Completed stages | 1 Foundations · 2 Boundaries & population · 3 Parks · 4 PostGIS · 5 Walk network & access points (2026-11-23) |
+| Next stage | 6: Walking accessibility analysis. [Lesson](learning/stage-06-walking-accessibility.md). **Not approved for implementation**; decisions Q1–Q7 pending |
+| Code | `pipeline/`: config, adapters, spatial core, parks, network, db migrate/status/load; 182 tests |
 | Database | schema at migration 0006; portland-or loaded (85,931 rows in 11 tables) |
-| Git | `main`, 1 commit ahead of `origin` (Stage 4). **Stage 5 prep and implementation uncommitted** |
+| Git | `main`, 3 commits ahead of `origin` (Stage 4, Stage 5 planning, Stage 5 `f03f451`). Stage 6 prep docs uncommitted |
 
 ## Currently being worked on
 
-- Stage 5 review. Your field check is done, and its fixes are applied (lesson §16): water-aware snapping and park gaps, two park tags dropped, and Ross Island listed as closed to the public.
+- Stage 6 preparation done. Waiting on decisions Q1–Q7 and implementation approval. The prototype found that 85.0% of residents live within a 10-minute walk of a park (straight line would say 97.2%), and that two small Stage 5 contact bugs need fixing first.
 - ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
@@ -36,9 +36,8 @@ uv run pytest                            # -m data / -m db to select; db tests u
 
 ## Next steps
 
-1. Review Stage 5 (`/learn:stage-review 5` or `/learn:review`).
-2. Commit when you're happy (nothing is committed yet).
-3. Then `/learn:advance` to prepare Stage 6 (walking accessibility analysis).
+1. Answer Stage 6 decisions Q1–Q7 (lesson §9).
+2. Approve implementation: `/learn:implement-stage 6`.
 
 ## Blockers / risks being watched
 
@@ -65,7 +64,7 @@ Target bullets (pending implementation):
 
 Completed so far:
 - Project planning and architecture design.
-- Stage 5 (implemented, awaiting review): offline walk-network build from a dated OSM snapshot (105k nodes, 8,370 km); found and fixed a walk-filter bias that dropped 119 km of shared-use trails and disconnected Hayden Island; edge-based snapping puts 99.35% of residents within 100 m; 11,878 park access points.
+- Stage 5: offline walk-network build from a dated OSM snapshot (105k nodes, 8,370 km); found and fixed a walk-filter bias that dropped 119 km of shared-use trails and disconnected Hayden Island; edge-based snapping puts 99.35% of residents within 100 m; 11,878 park access points.
 - Stage 4: multi-region PostGIS schema with checksummed SQL migrations, typed SRID columns and constraints; atomic binary-COPY loader (63,817 rows in 1.7 s); PostGIS and GeoPandas membership agree exactly (24,785 pairs); GiST point-in-polygon join about 60× faster than without the index, measured with `EXPLAIN ANALYZE`.
 - Stage 3: OSM park extraction from a checksummed snapshot with config-driven classification rules; overlapping features merged with union-find; validated against Metro ORCA (area precision 0.90, recall 0.93), with the 20 largest disagreements explained.
 - Stage 2: reproducible Census/TIGER/ArcGIS ETL; population reconciles exactly to the official 2020 total (652,503) and to all 4 council districts; overlapping-neighborhood membership model; 92 tests.

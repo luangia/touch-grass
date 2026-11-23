@@ -344,3 +344,15 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 - Portland lists Ross Island Natural Area (`w1365628608`).
 - Tests +4 (exclusion, missing id, wrong name, duplicate). 182 total, all passing.
 - Reprocessed, reran the network and reloaded: 448 parks, 73.21 km²; precision 0.8972, recall 0.9284 (ORCA includes Ross Island); 2 parks without network contact. Nothing committed.
+
+## 2026-11-23 — Stage 5 committed and complete; Stage 6 prepared (no project code)
+
+**Stage 5:** committed as `f03f451`. Verified afterwards: 182 tests; both validation reports pass all hard checks; network outputs fresh; schema at 0006; tree clean.
+
+**Stage 6 prototype** (scratch script, read-only on data):
+- Speed: SciPy csgraph search 0.02 s vs NetworkX 0.30 s; identical distances on 104,785 nodes.
+- Same-edge rule matters for 614 blocks (up to 624 m).
+- The invariant `network ≥ straight − 15 m` caught **two Stage 5 bugs**: one contact span covering two separate touches (4 blocks, up to 44.6 m too short), and interior park trails not counted as contact (a Forest Park block at 2,628 m).
+- First results: within 800 m, network 85.0% vs straight line 97.2%; median detour 1.35.
+
+**Created:** `docs/learning/stage-06-walking-accessibility.md` (Q1–Q7 pending).
