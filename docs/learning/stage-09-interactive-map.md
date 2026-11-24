@@ -1,6 +1,6 @@
 # Stage 9: Interactive Map Frontend
 
-> Status: **prepared, not implemented.** Code snippets show the planned approach.
+> Status: **implemented 2026-11-23, awaiting your review.** §13 is what was built, §14 the browser check, §15 the answers to §12, and §16 where the build departed from the plan.
 > Findings marked **(prototype 2026-11-23)** come from a throwaway single-file page in the scratch area (MapLibre 6.17 from a CDN, the OpenFreeMap basemap, the running Stage 8 API), viewed in the in-app browser. No project code was changed. The temporary launch entry used to serve it was reverted.
 
 ## 1. Objective and expected outcome
@@ -220,3 +220,59 @@ The frontend **computes no metrics** (ARCHITECTURE §2): it only chooses colors 
 - Monmonier, M. (2018). *How to Lie with Maps*, 3rd ed.: classification and color.
 - OpenFreeMap terms of service and FAQ (read 2026-11-23).
 - openapi-typescript documentation.
+
+## 13. What was built (2026-11-23)
+
+| Piece | Where | What it does |
+|---|---|---|
+| Project | `web/package.json`, `package-lock.json`, `.npmrc` (`before=2026-11-08`, `save-exact`), `.nvmrc` (24), `.prettierrc.json`, `tsconfig.json` (strict + `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`) | MapLibre 6.17.0, React 19.1.10; dev: Vite 8.3.6, TypeScript 5.9.3, Vitest 5.1.0, jsdom 29, Testing Library, openapi-typescript 7.13, Prettier 3.9.10 (the `before` cutoff picked it over 3.10) |
+| API client | `src/api/client.ts`, `schema.d.ts` (generated, `npm run gen:api`), `geojson.ts` | Typed fetches with abort signals and readable errors; base URL from `VITE_API_URL` |
+| Style | `src/map/style.ts` | Block classes from the region's thresholds (cool ≤ the underserved threshold, warm beyond, gray for no route); share classes at fixed 50/70/85/95%; legend items from the same lists |
+| Map bridge | `src/map/MapView.tsx` | Created once per region. Data layers slotted into the basemap: area fills under water/roads/labels (opaque, so overlaps don't stack; transparent from z12 but still clickable); blocks and parks under roads; outlines (solid, dashed for unranked) and hover/selection highlight under labels. Feature state for hover and selection; a click reports all overlapping areas and the block |
+| UI | `App.tsx`, `components/Controls.tsx` (search combobox, threshold and area-type toggles), `SidePanel.tsx`, `Legend.tsx`, `state/url.ts`, `format.ts`, `styles.css` | URL state with back/forward; the finest area type and the underserved threshold by default; the panel shows shares at every threshold, underserved residents, the typical walk, reachable park area, the not-ranked note, overlapping areas, the clicked block, and caveats + source attributions from `/methodology`; a collapsible legend; a phone layout |
+| Tests | `tests/` (25) | Style mapping evaluated by **MapLibre's own expression evaluator** at every class boundary; URL round trip; formatting; components with a mocked map; App start-up and API-down state; region/coordinate guard; live-API contract (skipped when the API is down) |
+| Dev server | `.claude/launch.json` → `web` | `npm --prefix web run dev` on :5173 |
+
+**Bugs and surprises, in the order found:**
+1. **MapLibre 6 has no default export** (and no UMD build): `import * as maplibregl`.
+2. **"Worker failed to load":** MapLibre finds its web worker relative to its own module, and Vite's dependency pre-bundling moves the module. Fix: import the worker file's URL (`?url`) and call `setWorkerUrl`. Works in dev and in `vite build` (the worker is emitted as its own asset).
+3. **Dark header and panel** in the in-app browser: it emulates `prefers-color-scheme: dark`, and the page had no background of its own. Fix: `color-scheme: light` and an explicit white background. My first attempt edited a line Prettier had already reformatted, so it silently did nothing. Lesson: edits that assert their target.
+4. **Back button did nothing:** I wrote `history.pushState` *inside* a React state updater. StrictMode runs updaters twice in development, so every click pushed two identical entries. Fix: updaters stay pure; an effect writes the URL.
+5. **Test asked for a "searchbox":** a search input with a suggestion list *is* a combobox to assistive technology. The test now finds it by role and label, which also checks the label.
+6. **Prettier reformatted the generated types,** so "regenerated types match" could never be true. `.prettierignore` now excludes `schema.d.ts`.
+7. **Legend covered the map on phones:** it's now collapsible, closed below 761 px, and pinned top-right there.
+
+## 14. Browser check (in-app browser, 2026-11-23)
+
+| Check | Result |
+|---|---|
+| Initial view | Fits the city from the API's bbox; 93 neighborhoods at 10 min; legend; attribution "OpenFreeMap © OpenMapTiles Data from OpenStreetMap" |
+| Load | Data layers ready **0.6 s** after reload (warm). Cold first load of the basemap was ~8 s in the prototype, all of it OpenFreeMap's CDN |
+| Search "North Tabor" | Selects it, URL `?threshold=10&area=neighborhood%3A16`, flies to z14. Panel: 5,663 residents; 6% / **54%** / 99% within 5 / 10 / 15 min; 2,602 beyond 10 min; typical walk 777 m (10 min); 1.1 ha |
+| Blocks at z14 | 425 blocks drawn. North Tabor's south half is orange and red (beyond 10 and 15 min); the blocks along Halsey near the parks are blue |
+| Threshold toggle | 5 min recolors the map (most neighborhoods under 50%), legend title follows, URL replaced (no history entry) |
+| Click | Selects the area under the cursor (Sabin: 65% / 100% / 100%); no console errors |
+| Back / forward | One entry per selection; back clears it, forward restores it |
+| Area type | Council districts: 4 areas, labels and search say "council district" |
+| Phone (375 px) | No horizontal scroll; header stacks; legend collapsed top-right; panel below the map |
+| Console | No errors in the checked flows |
+| `vite build` | Builds; main chunk 1.27 MB (353 KB gzipped), mostly MapLibre; worker emitted separately |
+
+### Review for you (acceptance)
+1. Open the map: it's running in the browser pane (**http://localhost:5173**; the API must be running too). Find your own neighborhood with the search box, check its 10-minute share, then zoom in and see which blocks are orange or red.
+2. Do the colors read the way they should? Blue means within 10 minutes and orange/red beyond. Parks are dark green. Neighborhood shares go from pale yellow to dark blue.
+3. Anything confusing in the panel wording?
+
+## 15. Answers to §12
+1. **Light green for 800–1,200 m:** green reads as "good" and sits next to the blues on the same ramp, so the eye groups it with the served blocks. But beyond 800 m *is* underserved by our definition. A legend can be correct and the picture still wrong; the hue change has to sit on the policy line.
+2. **Fixed vs quantile at 5 min:** fixed breaks show that 57 of 93 neighborhoods have under half their residents within 5 minutes, which is the truth. Quantiles would paint a fifth of the city dark blue, implying "these are well served at 5 minutes" when the share there may be only 45%. Quantiles answer "how does this area rank?"; fixed breaks answer "how well served is it?". The map's question is the second.
+3. **Overlapping transparent fills:** where two 60%-opaque polygons overlap, the colors multiply into a darker, more saturated patch. It looks like a third class ("even better served") that exists nowhere in the data. Opaque fills (the later one covers the earlier) plus "this spot is in 2 areas" in the panel avoid it.
+4. **`new maplibregl.Map` on each render:** every threshold change would tear down the WebGL context, refetch the style, fonts and tiles (seconds), lose the camera position, and leak contexts (browsers cap them at about 16). The bridge creates the map once and applies changes with `setData` and feature state.
+
+## 16. Departures from the plan
+- **TypeScript 5.9.3, not 7.0** (openapi-typescript requires `^5`), and **jsdom 29** (30+ excludes Node 25). Both recorded in D-024.
+- **`@types/node`** added for the tests' file checks, and **`@maplibre/maplibre-gl-style-spec`** (already a MapLibre dependency) made explicit so tests can run MapLibre's own expression evaluator.
+- **An area-type toggle** (neighborhoods / council districts) came almost free from the API and the D-022 MAUP point, so it's in.
+- **Dev-only `window.__map`** for the scripted browser check and console debugging; it isn't present in production builds.
+- **The panel's "About these numbers"** shows the caveats and source attributions now (RLIS requires the attribution); the full methodology page remains Stage 10.
+

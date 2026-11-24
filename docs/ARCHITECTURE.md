@@ -51,7 +51,7 @@ TouchGrass is a classic **batch-analysis + read-only serving** GIS system. The e
 | Pipeline steps | `pipeline/src/touchgrass/pipeline/` | `sources` (raw input list), `fetch` (network), `process` (offline → GeoParquet), `validate` (hard/soft checks → `validation.json`) | Download inside `process` |
 | Database | `db/` (migrations, SQL) | Persist normalized data + results, enforce constraints | Hold raw downloads |
 | API | `api/` (own uv project, package `touchgrass_api`; D-023) | Read-only queries, serialization, validation; GeoJSON and MVT built in PostGIS | Run heavy analysis; import the pipeline (the schema is the contract) |
-| Frontend | `web/` | Visualization, interaction, explanation | Compute metrics itself |
+| Frontend | `web/` (Vite + React + TS + MapLibre; D-024) | Visualization, interaction, explanation; colors from pure style functions; state in the URL | Compute metrics itself; name any region or coordinate |
 
 ## 3. Data flow (one region, end to end)
 

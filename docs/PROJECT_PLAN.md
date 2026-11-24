@@ -1,6 +1,6 @@
 # Project Plan — TouchGrass
 
-> Status: **Stages 1–8 complete. Stage 9 being prepared** (not approved for implementation). Stages 10–11 not started.
+> Status: **Stages 1–8 complete. Stage 9 implemented (2026-11-23), awaiting your review.** Stages 10–11 not started.
 > See [ARCHITECTURE.md](ARCHITECTURE.md) for design and [DECISIONS.md](DECISIONS.md) for the trade-offs behind it.
 
 ## 1. Problem
@@ -250,7 +250,7 @@ Each stage: objective, functional requirements, concepts, dependencies, tasks, d
 
 ### Stage 9 — Interactive map frontend
 
-> **Being prepared.** [Lesson](learning/stage-09-interactive-map.md); decisions Q1–Q11 pending. The prototype confirmed OpenFreeMap (no key; attribution automatic) and showed that the block colors must break at the 10-minute line.
+> **Implemented 2026-11-23, awaiting review.** [Lesson](learning/stage-09-interactive-map.md) (§13 built, §14 browser check and review items); decisions in D-024. `web/`, 25 tests.
 
 **Objective.** A MapLibre map that explores parks, neighborhoods, and walking access.
 

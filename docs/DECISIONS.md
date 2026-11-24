@@ -474,3 +474,27 @@ TouchGrass is a public portfolio project, so clipping, reprojecting or overlayin
 | Q7 | gzip (`GZipMiddleware`), `ETag` from the run id with `Cache-Control`, and CORS from a configured origin list (GET only). |
 | Q8 | Every API session is read-only (`default_transaction_read_only = on`). The startup check fails if the schema version differs. A dedicated SELECT-only role is deferred to deployment (Stage 11). |
 | Q9 | The map caveat text has one source: the pipeline writes it into the metrics run record (`summary.caveats`), and `/methodology` serves it. |
+
+---
+
+## D-024 — Map frontend: Vite + React + MapLibre, honest classification, URL state
+
+**Status:** Accepted (2026-11-23, Stage 9 Q1–Q11, "Approve as recommended")
+
+| # | Choice |
+|---|---|
+| Q1 | `web/`: Vite + React + TypeScript (strict), npm with `.npmrc` `before=2026-11-08` (the D-014 cutoff) and a committed lockfile, Prettier, no ESLint. `.nvmrc` = 24 (LTS); Node 25 also works. |
+| Q2 | Plain `maplibre-gl` with a small React bridge component; no wrapper library. |
+| Q3 | API types generated from the API's `/openapi.json` (openapi-typescript, committed). GeoJSON property types are hand-written and checked against the live API. |
+| Q4 | Neighborhood fill below z12, drawn under the basemap's water, roads and labels; outlines at all zooms; blocks from z12; parks always. |
+| Q5 | Blocks: fixed classes at the region's thresholds, two cool (≤ 5, ≤ 10 min), two warm (≤ 15, > 15), gray for no route. The threshold toggle doesn't change them. |
+| Q6 | Neighborhoods: share within the toggled threshold, fixed breaks 50 / 70 / 85 / 95%. Areas below the ranking floor get a dashed outline. |
+| Q7 | ColorBrewer-derived, colorblind-safe palettes (RdYlBu split at the underserved threshold; YlGnBu for shares). The legend and panel always carry text. |
+| Q8 | React state mirrored to the URL (`region`, `threshold`, `area`); no state library. |
+| Q9 | Find a neighborhood by name (combobox) or by clicking. Address search is out of scope (external geocoder, privacy). |
+| Q10 | Basemap: OpenFreeMap positron, URL from `VITE_BASEMAP_STYLE`. No SLA, noted for Stage 11. |
+| Q11 | Vitest + Testing Library (jsdom, map mocked) + a scripted check in the in-app browser; no Playwright yet. |
+
+**Version notes (implementation):**
+- **TypeScript 5.9.3, not 7.0:** openapi-typescript 7.13 requires `typescript ^5`.
+- **jsdom 29:** jsdom 30+ declares Node `^22.22 || ^24.15 || >=26` and excludes Node 25, which is installed here.

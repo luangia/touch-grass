@@ -469,3 +469,18 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 
 **Created:** `docs/learning/stage-09-interactive-map.md` (Q1–Q11 pending).
 
+## 2026-11-23 — Stage 9 implemented (approved "Approve as recommended", Q1–Q11)
+
+**Decisions:** D-024 (with version notes: TypeScript 5.9.3 for openapi-typescript; jsdom 29 for Node 25).
+
+**Built:** lesson §13.
+- `web/`: the API client and generated types, pure style functions, the MapLibre bridge, search and toggles, side panel, legend, URL state, and a phone layout.
+- `.claude/launch.json` gains a `web` entry.
+- 25 tests; tsc strict and Prettier are clean; `vite build` works.
+
+**Bugs found in the browser:** missing default export; worker URL under Vite pre-bundling (`setWorkerUrl`); a dark-mode bleed; a double `pushState` from a side effect in a state updater (StrictMode); the legend covering the map on phones. Two test-side fixes: the combobox role, and Prettier reformatting the generated types. Details in lesson §13.
+
+**Browser check (lesson §14):** search → North Tabor (54% within 10 min, 2,602 beyond) → z14 blocks; toggle, click, back/forward, area-type switch and phone layout all work, with no console errors.
+
+**Not verified:** a real phone, and browsers other than the in-app Chromium. Nothing committed.
+

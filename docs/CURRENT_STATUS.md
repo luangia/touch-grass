@@ -6,21 +6,21 @@ _Last updated: 2026-11-23_
 
 | Item | Status |
 |---|---|
-| Phase | **Stages 1–8 complete. Stage 9 being prepared**, not approved for implementation |
+| Phase | **Stages 1–8 complete. Stage 9 implemented (2026-11-23)**, awaiting your review |
 | Completed stages | 1 Foundations · 2 Boundaries & population · 3 Parks · 4 PostGIS · 5 Walk network · 6 Walking accessibility · 7 Neighborhood metrics · 8 API (2026-11-23) |
-| Next stage | 9: Interactive map. [Lesson](learning/stage-09-interactive-map.md). **Not approved for implementation**; decisions pending |
-| Code | `pipeline/`: … + `touchgrass analyze`, `touchgrass metrics`; 242 tests. `api/`: FastAPI, 10 endpoints; 35 tests |
+| Current stage | 9: Interactive map. [Lesson](learning/stage-09-interactive-map.md) §13–16; decisions D-024. Review items in §14 |
+| Code | `pipeline/`: … + `touchgrass analyze`, `touchgrass metrics`; 242 tests. `api/`: FastAPI, 10 endpoints; 35 tests. `web/`: React + MapLibre map; 25 tests |
 | Database | schema at migration 0008; portland-or loaded (3 analysis runs; latest `7c1fc6efaf00effa`, metrics on clean commit `0747c94`) |
-| Git | `main`, 9 commits ahead of `origin`. Stage 9 prep docs uncommitted |
+| Git | `main` pushed through Stage 8; 1 commit ahead (Stage 9 planning). Stage 9 implementation uncommitted |
 
 ## Currently being worked on
 
-- Stage 9 preparation. Waiting on decisions and implementation approval.
+- Stage 9 implemented: the map runs (`.claude/launch.json` → `api` + `web`). Waiting on your review (lesson §14).
 - ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
 
-See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff). Stage 2 added D-015 (data-source choices) and amended D-007 (Census interior points). Stage 3 added D-017 (dated OSM extracts + pyosmium; uv-managed Python) and D-018 (park rules and merging; amendment 2 adds `veto_tags`). Stage 4 added D-019 (COPY loading, SQL migrations, 4326-only storage, long ACS table, test database, settings). Stage 6 added D-021 (SciPy engine, no cutoff, same-edge rule, run ids from content) and fixed two Stage 5 contact bugs. Stage 8 added D-023 (separate read-only API project; SQL-built GeoJSON and MVT; z12–14 tiles; ETag by run). Stage 7 added D-022 (areas, rankings, priority, reachable park area, ACS allocation, reliability) and amended D-011 (priority formula). Stage 5 added D-020 (offline OSMnx build, walk filter with shared-use paths re-admitted, largest component plus a report, edge snapping, UTM edge weights) and amended D-006 (no sampled fallback).
+See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff). Stage 2 added D-015 (data-source choices) and amended D-007 (Census interior points). Stage 3 added D-017 (dated OSM extracts + pyosmium; uv-managed Python) and D-018 (park rules and merging; amendment 2 adds `veto_tags`). Stage 4 added D-019 (COPY loading, SQL migrations, 4326-only storage, long ACS table, test database, settings). Stage 6 added D-021 (SciPy engine, no cutoff, same-edge rule, run ids from content) and fixed two Stage 5 contact bugs. Stage 9 added D-024 (Vite + React + MapLibre; colors break at the underserved line; fixed share breaks; URL state; OpenFreeMap). Stage 8 added D-023 (separate read-only API project; SQL-built GeoJSON and MVT; z12–14 tiles; ETag by run). Stage 7 added D-022 (areas, rankings, priority, reachable park area, ACS allocation, reliability) and amended D-011 (priority formula). Stage 5 added D-020 (offline OSMnx build, walk filter with shared-use paths re-admitted, largest component plus a report, edge snapping, UTM edge weights) and amended D-006 (no sampled fallback).
 
 ## How to run what exists
 
@@ -38,8 +38,8 @@ uv run pytest                            # -m data / -m db to select; db tests u
 
 ## Next steps
 
-1. Answer the Stage 9 decisions (lesson §9).
-2. Approve implementation: `/learn:implement-stage 9`.
+1. Review Stage 9: use the map at http://localhost:5173 (lesson §14).
+2. On approval: commit, then `/learn:advance` to Stage 10 (comparison, underserved view, methodology).
 
 ## Blockers / risks being watched
 

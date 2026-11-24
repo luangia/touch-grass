@@ -2,7 +2,7 @@
 
 **How far is nature, really?** TouchGrass measures how easily residents can *walk* to parks and natural areas, neighborhood by neighborhood — starting with Portland, Oregon, and designed to support more cities through configuration.
 
-> **Status: Stages 1–8 of 11 implemented**: the data pipeline, walking-distance analysis, neighborhood metrics, and a read-only API. The map (Stage 9) is next. See [docs/CURRENT_STATUS.md](docs/CURRENT_STATUS.md).
+> **Status: Stages 1–9 of 11 implemented**: the data pipeline, walking-distance analysis, neighborhood metrics, a read-only API, and an interactive map. See [docs/CURRENT_STATUS.md](docs/CURRENT_STATUS.md).
 
 ## Quickstart (what works today)
 
@@ -27,6 +27,11 @@ cd ../api                               # read-only HTTP API over the loaded dat
 uv sync
 uv run uvicorn --factory touchgrass_api.main:create_app --port 8000   # docs: /docs
 uv run pytest                           # seeds a throwaway touchgrass_apitest database
+
+cd ../web                               # the map (needs the API running)
+npm ci                                  # exact versions from package-lock.json
+npm run dev                             # http://localhost:5173
+npm test                                # tsc + Vitest
 ```
 
 Adding a city = adding `config/regions/<region-id>.yaml` (more fields arrive in Stages 2–3).
