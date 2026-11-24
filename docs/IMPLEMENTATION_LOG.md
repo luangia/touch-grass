@@ -421,3 +421,18 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 
 **Not verified:** the North Tabor and Alameda results against the map (asked of you, lesson §14). The metrics record shows uncommitted code (`dirty: true`) until Stage 7 is committed and `metrics` rerun. Nothing committed.
 
+## 2026-11-23 — Stage 7 committed and complete; Stage 8 prepared (no project code)
+
+**Stage 7:**
+- Your field check confirmed Alameda. North Tabor's low share comes from distance: the network has the SE Yamhill access to Mt. Tabor Park (lesson §17).
+- Committed as `0b7fd58`; `metrics` rerun on the clean commit (`dirty: false`) and reloaded.
+- Verified: 242 tests; ruff and mypy clean; network, run and metrics fresh; tree clean.
+
+**Stage 8 prototype** (read-only SQL against the dev database, scratch scripts):
+- Neighborhood GeoJSON: 441 KiB raw → 120 KiB simplified to 5 m with 6 decimals (28 KiB gzipped). All blocks as GeoJSON would be 4.8 MB.
+- Block vector tiles: every z12 tile < 50 ms and < 182 KiB; a z10 tile takes 393 ms and 661 KiB. Tiles outside the region are empty.
+- Resolving the latest run once beats joining `is_latest` inside the tile query.
+- Per-polygon simplification at 20 m opens 87,761 m² of gaps between council districts; `ST_CoverageSimplify` opens 366 m², but it needs non-overlapping polygons.
+
+**Created:** `docs/learning/stage-08-fastapi-backend.md` (Q1–Q9 pending).
+

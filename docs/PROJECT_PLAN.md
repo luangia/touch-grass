@@ -1,6 +1,6 @@
 # Project Plan — TouchGrass
 
-> Status: **Stages 1–6 complete. Stage 7 implemented (2026-11-23), awaiting your review.** Stages 8–11 not started.
+> Status: **Stages 1–7 complete. Stage 8 being prepared** (not approved for implementation). Stages 9–11 not started.
 > See [ARCHITECTURE.md](ARCHITECTURE.md) for design and [DECISIONS.md](DECISIONS.md) for the trade-offs behind it.
 
 ## 1. Problem
@@ -205,7 +205,7 @@ Each stage: objective, functional requirements, concepts, dependencies, tasks, d
 
 ### Stage 7 — Neighborhood aggregation & underserved metrics
 
-> **Implemented 2026-11-23, awaiting review.** [Lesson](learning/stage-07-neighborhood-metrics.md) (§13 built, §14 results and review items); decisions in D-022 and the D-011 amendment (priority formula). `touchgrass metrics`, migration 0008.
+> **Complete 2026-11-23 (`0b7fd58`).** [Lesson](learning/stage-07-neighborhood-metrics.md) (§13 built, §14 results, §17 your field check); decisions in D-022 and the D-011 amendment (priority formula). `touchgrass metrics`, migration 0008.
 
 **Objective.** Population-weighted metrics per analysis area, underserved identification, and demographic context.
 
@@ -229,6 +229,8 @@ Each stage: objective, functional requirements, concepts, dependencies, tasks, d
 ---
 
 ### Stage 8 — FastAPI backend
+
+> **Being prepared.** [Lesson](learning/stage-08-fastapi-backend.md); decisions Q1–Q9 pending. The prototype puts block tiles at z12–14 (every tile < 50 ms) and simplified neighborhood GeoJSON at 120 KiB.
 
 **Objective.** Read-only, typed API exposing regions, areas, metrics, parks, and block tiles.
 

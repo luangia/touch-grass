@@ -1,6 +1,6 @@
 # Stage 7: Neighborhood Aggregation & Underserved Metrics
 
-> Status: **implemented 2026-11-23, awaiting your review** (the review items are in §14). §13 is what was built, §14 the results on Portland, §15 the answers to §12, and §16 where the build departed from the plan.
+> Status: **complete (2026-11-23, commit `0b7fd58`)**. Your field check is in §17. §13 is what was built, §14 the results on Portland, §15 the answers to §12, and §16 where the build departed from the plan.
 > Numbers marked **(prototype 2026-11-23)** come from a throwaway script run on the latest Stage 6 run (`7c1fc6efaf00effa`, commit `d3fd91d`) in the scratch area. No project code was changed. Where the prototype itself was approximate, that's said.
 
 ## 1. Objective and expected outcome

@@ -6,16 +6,16 @@ _Last updated: 2026-11-23_
 
 | Item | Status |
 |---|---|
-| Phase | **Stages 1–6 complete. Stage 7 implemented (2026-11-23)**, awaiting your review |
-| Completed stages | 1 Foundations · 2 Boundaries & population · 3 Parks · 4 PostGIS · 5 Walk network · 6 Walking accessibility (2026-11-23) |
-| Current stage | 7: Neighborhood metrics. [Lesson](learning/stage-07-neighborhood-metrics.md) §13–16; decisions D-022 + D-011 amendment. Review items in §14 |
+| Phase | **Stages 1–7 complete. Stage 8 being prepared**, not approved for implementation |
+| Completed stages | 1 Foundations · 2 Boundaries & population · 3 Parks · 4 PostGIS · 5 Walk network · 6 Walking accessibility · 7 Neighborhood metrics (2026-11-23) |
+| Next stage | 8: FastAPI backend. [Lesson](learning/stage-08-fastapi-backend.md). **Not approved for implementation**; decisions pending |
 | Code | `pipeline/`: … + `touchgrass analyze`, `touchgrass metrics`; 242 tests |
-| Database | schema at migration 0008; portland-or loaded (3 analysis runs; latest `7c1fc6efaf00effa`, with metrics computed from uncommitted Stage 7 code) |
-| Git | `main`, 5 commits ahead of `origin`. Stage 7 prep docs and implementation uncommitted |
+| Database | schema at migration 0008; portland-or loaded (3 analysis runs; latest `7c1fc6efaf00effa`, metrics on clean commit `0b7fd58`) |
+| Git | `main`, 6 commits ahead of `origin`. Stage 8 prep docs uncommitted |
 
 ## Currently being worked on
 
-- Stage 7 implemented: all 8 hard checks pass on Portland. Waiting on your review of the report and the 3 map checks (lesson §14).
+- Stage 8 preparation. Waiting on decisions and implementation approval.
 - ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
@@ -38,8 +38,8 @@ uv run pytest                            # -m data / -m db to select; db tests u
 
 ## Next steps
 
-1. Review Stage 7: the report and the three map checks in lesson §14 (North Tabor, Alameda, the two rankings).
-2. On approval: commit, rerun `metrics` on the clean commit, then `/learn:advance` to Stage 8 (API).
+1. Answer the Stage 8 decisions (lesson §9).
+2. Approve implementation: `/learn:implement-stage 8`.
 
 ## Blockers / risks being watched
 
@@ -60,7 +60,7 @@ Target bullets (pending implementation):
 - ☐ Built a reproducible geospatial ETL pipeline ingesting US Census (2020 blocks, ACS 5-year), TIGER/Line, and OpenStreetMap data with provenance tracking and automated validation. _(Stages 2–3)_
 - ☑ Computed pedestrian-network walking distance from 10,372 census blocks to the nearest of 15,601 park access points with a multi-source Dijkstra (24 ms), showing 85% of residents within a 10-minute walk vs 97% by straight line (median detour ratio 1.35); verified against OSRM. _(Stages 5–6)_
 - ☑ Designed a multi-region PostGIS schema with GiST-indexed spatial joins, measuring a ~60× speedup via `EXPLAIN ANALYZE`. _(Stage 4)_
-- ☐ Produced population-weighted 5/10/15-minute park-access metrics for 93 neighborhoods and 4 council districts, identifying 97,753 residents beyond a 10-minute walk, with ACS context carrying propagated margins of error and reliability labels. _(Stage 7, pending your review)_
+- ☑ Produced population-weighted 5/10/15-minute park-access metrics for 93 neighborhoods and 4 council districts, identifying 97,753 residents beyond a 10-minute walk, with ACS context carrying propagated margins of error and reliability labels. _(Stage 7)_
 - ☐ Delivered a typed FastAPI service (GeoJSON + PostGIS-generated vector tiles) and a React/MapLibre interactive map for neighborhood comparison. _(Stages 8–10)_
 - ☐ Architected configuration-driven region onboarding so new cities require only a YAML config and data sources. _(Stages 1–2)_
 
