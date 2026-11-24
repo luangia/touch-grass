@@ -6,21 +6,21 @@ _Last updated: 2026-11-23_
 
 | Item | Status |
 |---|---|
-| Phase | **Stages 1–5 complete. Stage 6 prepared**, awaiting implementation approval |
+| Phase | **Stages 1–5 complete. Stage 6 implemented, awaiting your review** |
 | Completed stages | 1 Foundations · 2 Boundaries & population · 3 Parks · 4 PostGIS · 5 Walk network & access points (2026-11-23) |
-| Next stage | 6: Walking accessibility analysis. [Lesson](learning/stage-06-walking-accessibility.md). **Not approved for implementation**; decisions Q1–Q7 pending |
-| Code | `pipeline/`: config, adapters, spatial core, parks, network, db migrate/status/load; 182 tests |
-| Database | schema at migration 0006; portland-or loaded (85,931 rows in 11 tables) |
-| Git | `main`, 3 commits ahead of `origin` (Stage 4, Stage 5 planning, Stage 5 `f03f451`). Stage 6 prep docs uncommitted |
+| Current stage | 6: Walking accessibility. [Lesson](learning/stage-06-walking-accessibility.md) §13 (built), §14 (results + route check) |
+| Code | `pipeline/`: … + `touchgrass analyze` (SciPy multi-source Dijkstra, run records); 204 tests |
+| Database | schema at migration 0007; portland-or loaded (2 analysis runs: the latest plus one historical) |
+| Git | `main`, 3 commits ahead of `origin`. **Stage 6 prep and implementation uncommitted** |
 
 ## Currently being worked on
 
-- Stage 6 preparation done. Waiting on decisions Q1–Q7 and implementation approval. The prototype found that 85.0% of residents live within a 10-minute walk of a park (straight line would say 97.2%), and that two small Stage 5 contact bugs need fixing first.
+- Stage 6 review. Your route check is done (lesson §16): 3 routes match OSRM exactly, and the 4th exposed an `access=no` gap, now fixed (D-020 amendment 3).
 - ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
 
-See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff). Stage 2 added D-015 (data-source choices) and amended D-007 (Census interior points). Stage 3 added D-017 (dated OSM extracts + pyosmium; uv-managed Python) and D-018 (park rules and merging; amendment 2 adds `veto_tags`). Stage 4 added D-019 (COPY loading, SQL migrations, 4326-only storage, long ACS table, test database, settings). Stage 5 added D-020 (offline OSMnx build, walk filter with shared-use paths re-admitted, largest component plus a report, edge snapping, UTM edge weights) and amended D-006 (no sampled fallback).
+See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff). Stage 2 added D-015 (data-source choices) and amended D-007 (Census interior points). Stage 3 added D-017 (dated OSM extracts + pyosmium; uv-managed Python) and D-018 (park rules and merging; amendment 2 adds `veto_tags`). Stage 4 added D-019 (COPY loading, SQL migrations, 4326-only storage, long ACS table, test database, settings). Stage 6 added D-021 (SciPy engine, no cutoff, same-edge rule, run ids from content) and fixed two Stage 5 contact bugs. Stage 5 added D-020 (offline OSMnx build, walk filter with shared-use paths re-admitted, largest component plus a report, edge snapping, UTM edge weights) and amended D-006 (no sampled fallback).
 
 ## How to run what exists
 
@@ -36,8 +36,9 @@ uv run pytest                            # -m data / -m db to select; db tests u
 
 ## Next steps
 
-1. Answer Stage 6 decisions Q1–Q7 (lesson §9).
-2. Approve implementation: `/learn:implement-stage 6`.
+1. Review Stage 6 (`/learn:stage-review 6` or `/learn:review`).
+2. Commit, then rerun `touchgrass analyze` for a run tied to the clean commit.
+3. Then `/learn:advance` to prepare Stage 7 (neighborhood metrics).
 
 ## Blockers / risks being watched
 
@@ -56,7 +57,7 @@ uv run pytest                            # -m data / -m db to select; db tests u
 
 Target bullets (pending implementation):
 - ☐ Built a reproducible geospatial ETL pipeline ingesting US Census (2020 blocks, ACS 5-year), TIGER/Line, and OpenStreetMap data with provenance tracking and automated validation. _(Stages 2–3)_
-- ☐ Computed pedestrian-network walking distance from ~N census blocks to nearest park access points using multi-source Dijkstra over an OSM walk graph, contrasting it with straight-line distance (median detour ratio X). _(Stages 5–6)_
+- ☐ Computed pedestrian-network walking distance from 10,372 census blocks to the nearest of 15,676 park access points with a multi-source Dijkstra (24 ms), showing 85% of residents within a 10-minute walk vs 97% by straight line (median detour ratio 1.35). _(Stages 5–6; finalize after review)_
 - ☑ Designed a multi-region PostGIS schema with GiST-indexed spatial joins, measuring a ~60× speedup via `EXPLAIN ANALYZE`. _(Stage 4)_
 - ☐ Produced population-weighted 5/10/15-minute park-access metrics for ~95 Portland neighborhoods, identifying X residents beyond a 10-minute walk. _(Stage 7)_
 - ☐ Delivered a typed FastAPI service (GeoJSON + PostGIS-generated vector tiles) and a React/MapLibre interactive map for neighborhood comparison. _(Stages 8–10)_

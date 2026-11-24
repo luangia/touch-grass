@@ -389,3 +389,35 @@ TouchGrass is a public portfolio project, so clipping, reprojecting or overlayin
 - **The network extent stays at the 2 km buffer (A).** Pieces the clip line cuts are now marked `touches_clip`, and a park without access gets a reason: `network_piece_cut_by_buffer_edge` (Rivervilla Park), `gap_crosses_water` or `no_network_within_max_gap`.
 - Schema change in migration 0006: `block_origins.snap_status`, `block_origins.component`, and `park_access_points.gap_m` plus method `gap`. 0005 is not edited.
 - Ross Island (closed to the public, not recorded in OSM) is resolved by D-018 amendment 4.
+
+**D-020 amendment 2 (2026-11-23, Stage 6 Q1):** two contact-interval bugs, found by the Stage 6 invariant `network ≥ straight line − tolerance`, are fixed in `core/access.py`.
+1. **One row per stretch.** An edge that touches a park at two separate places now gives two access rows (`access_id` suffix `#k`), not one span from the first touch to the last. The single span put the street in between "at the park": 4 Portland blocks came out up to 44.6 m closer than the straight line allows.
+2. **Interior edges count.** Contact = the edge ∩ the park grown by `access_tolerance_m`, not just its boundary ring. A block on a trail inside Forest Park went from 2,628 m to 203 m.
+- Portland access points: 11,771 → 15,676 (interior trails).
+
+---
+
+## D-021 — Walking accessibility analysis: engine, rules, run identity
+
+**Status:** Accepted (2026-11-23, Stage 6 Q1–Q7, "Approve as recommended")
+
+| # | Choice |
+|---|---|
+| Q1 | Fix the two Stage 5 contact bugs in this stage (D-020 amendment 2). |
+| Q2 | Engine: `scipy.sparse.csgraph.dijkstra(min_only=True)`, with one extra node per access point joined to its edge's ends by the access offsets. It returns the nearest access point per node; NetworkX is the test oracle and a hard check on a fixed random sample. |
+| Q3 | **No cutoff.** Every reachable block gets an exact distance; the search takes 24 ms. |
+| Q4 | **Same-edge rule on:** a block whose own edge holds an access stretch may walk straight along it. 665 Portland blocks use it. |
+| Q5 | Straight-line baseline = Euclidean distance (analysis CRS) from the block point to the **nearest park polygon**. |
+| Q6 | Unreachable blocks are kept: `reachable = false`, distance NULL. Stage 7 counts them as beyond every threshold. |
+| Q7 | Run id = first 16 hex chars of SHA-256 over (parameters, input checksums, code version: git commit + a hash of uncommitted `pipeline/src` changes). Runs accumulate in `data/processed/<region>/runs/<run_id>/`; `analysis_latest.json` points at the newest; the loader reloads every run on disk and refuses a stale latest run. |
+
+**Implementation notes:**
+- **SciPy traps handled:** duplicate sparse entries are *summed* (so parallel edges are reduced to their minimum first), and explicitly stored zeros are edges, so `eliminate_zeros()` is never called. Both are pinned by tests.
+- **Invariant slack is 30 m:** the 15 m contact tolerance, plus up to 15 m where an entrance node is snapped onto its edge.
+- `block_access` has **no foreign keys** to the current blocks or parks: a historical run keeps the ids it was computed with.
+
+**D-020 amendment 3 (2026-11-23, approved "Apply the fix" after your route check):** pedestrian access follows OSM convention, not OSMnx.
+- **Closures:** `access` ∈ {private, **no**} and `foot` ∈ {no, **private**} exclude a way. OSMnx's walk rules miss `access=no` and `foot=private`; OSRM's foot profile does not.
+- **`foot=*` overrides `access`:** a way with `foot` ∈ {yes, designated, permissive} is walkable despite an `access` closure (`WalkFilter.foot_overrides`, applied to the keys in `foot_overrides_keys` = [access]). It does not override `service=private`, `area=yes` or the others.
+- **Found by:** the route check. The 7.7 km "longest walk" started on an `access=no` airport service road (OSM way 484824281) that OSRM refused.
+- **Portland effect:** ways 123,690 → 123,245 (−586 `access=no` and −60 `foot=private`, +152 foot-legal `access=private`); main network 8,370 → 8,323 km, 98.40% → 98.47% of nodes, 490 → 476 pieces; access points 15,676 → 15,601. 35 blocks changed by more than 1 m (20 shorter, 15 longer). The longest-walk block went from 7,709 m to **806 m**: it now snaps to the Marine Drive Trail (584 m, the same start OSRM uses) and reaches Broughton Beach; OSRM agrees. City-wide shares are unchanged to 0.1 point (85.0% within 10 min).

@@ -371,3 +371,25 @@ def test_load_refuses_stale_network(db: Conn, tmp_path: Path) -> None:
     blocks.to_parquet(paths.processed / "blocks.parquet", index=False, compression="gzip")
     with pytest.raises(dbload.LoadError, match=r"blocks\.parquet changed"):
         dbload.load_region(db, cfg, paths)
+
+
+def test_load_includes_analysis_runs(db: Conn, tmp_path: Path) -> None:
+    from touchgrass.pipeline.analyze import run_analysis
+    from touchgrass.pipeline.network import run_network
+
+    from .test_network import build_network_region
+
+    cfg, paths = build_network_region(tmp_path)
+    run_network(cfg, paths)
+    first = run_analysis(cfg, paths, repo=tmp_path)
+    data = cfg.model_dump(mode="json")
+    data["analysis"]["walk_speed_kmh"] = 4.0
+    second = run_analysis(RegionConfig.model_validate(data), paths, repo=tmp_path)
+    loaded = dbload.load_region(db, cfg, paths)
+    assert loaded.rows["analysis_runs"] == 2 and loaded.rows["block_access"] == 6
+    latest = db.execute("SELECT run_id FROM touchgrass.analysis_runs WHERE is_latest").fetchall()
+    assert latest == [(second.run_id,)]
+    # Reloading keeps both runs (history lives on disk, not only in the database).
+    dbload.load_region(db, cfg, paths)
+    n = db.execute("SELECT count(DISTINCT run_id) FROM touchgrass.block_access").fetchone()
+    assert n == (2,) and first.run_id != second.run_id

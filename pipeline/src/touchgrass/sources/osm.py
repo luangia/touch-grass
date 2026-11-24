@@ -211,9 +211,14 @@ def walk_exclusion(tags: dict[str, str], walk: WalkFilter) -> str | None:
     highway = tags.get("highway")
     if highway is None:
         return "no_highway"
-    matched = tag_matches(tags, walk.exclude_tags)
-    if matched is not None:
-        return matched
+    foot_allowed = tags.get("foot") in walk.foot_overrides
+    for key, values in walk.exclude_tags.items():
+        value = tags.get(key)
+        if value is None or not (value in values or ANY_VALUE in values):
+            continue
+        if foot_allowed and key in walk.foot_overrides_keys:
+            continue  # foot=* beats the general access tag for pedestrians
+        return f"{key}={value}"
     if re.search(walk.exclude_highway, highway):
         readmitted = any(
             all(tags.get(k) in values for k, values in rule.items()) for rule in walk.readmit

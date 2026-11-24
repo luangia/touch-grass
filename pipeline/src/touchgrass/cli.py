@@ -17,6 +17,9 @@ Stage 4 commands (PostGIS; settings from $DATABASE_URL or the repo's .env):
 
 Stage 5 commands:
   touchgrass network <region-id>               walk graph, block origins, park access points
+
+Stage 6 commands:
+  touchgrass analyze <region-id>               walking distance from every block to a park
 """
 
 from __future__ import annotations
@@ -34,6 +37,7 @@ from touchgrass.db import migrate as dbmigrate
 from touchgrass.db.load import LoadError, row_counts
 from touchgrass.db.load import load_region as db_load_region
 from touchgrass.paths import RegionPaths, resolve_data_dir
+from touchgrass.pipeline.analyze import run_analysis
 from touchgrass.pipeline.fetch import run_fetch
 from touchgrass.pipeline.network import run_network
 from touchgrass.pipeline.process import MissingDataError, load_outputs, load_stats, run_process
@@ -332,3 +336,36 @@ def network_cmd(
         f"{len(a['parks_without_access'])} without network contact\n"
     )
     _print_checks(result.checks, paths.processed / "network_validation.json")
+
+
+# ------------------------------------------------------------------ Stage 6: analysis
+
+
+@app.command("analyze")
+def analyze_cmd(
+    region: Annotated[str, typer.Argument(help="Region id.")],
+    config_dir: ConfigDirOption = None,
+    data_dir: DataDirOption = None,
+) -> None:
+    """Walking distance and time from every populated block to its nearest park."""
+    cfg, paths = _region_and_paths(region, config_dir, data_dir)
+    repo = (config_dir or find_config_dir()).parent
+    try:
+        result = run_analysis(cfg, paths, repo, progress=lambda m: typer.echo(f"→ {m}"))
+    except MissingDataError as err:
+        typer.secho(f"✗ {err}", fg="red", err=True)
+        raise typer.Exit(code=1) from err
+    s = result.record["summary"]
+    typer.echo(
+        f"\nrun {result.run_id}  ({result.record['seconds']['total']} s; search "
+        f"{result.record['seconds']['search']} s)"
+    )
+    typer.echo("share of residents within (network | straight line):")
+    for minutes, shares in s["share_within_minutes"].items():
+        typer.echo(f"  {minutes:>2} min: {shares['network']:6.1%} | {shares['straight_line']:6.1%}")
+    typer.echo(
+        f"median walk {s['network_m']['median_population_weighted']} m (population-weighted); "
+        f"median detour ratio {s['detour_ratio']['median']}; unreachable {len(s['unreachable'])}\n"
+    )
+    assert result.run_dir is not None
+    _print_checks(result.checks, result.run_dir / "analysis_validation.json")

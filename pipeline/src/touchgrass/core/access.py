@@ -3,11 +3,10 @@
 Two methods, both producing a position on a network edge (so Stage 6 can seed Dijkstra
 from points that are not graph nodes, via a virtual source):
 
-``edge_contact``  every edge that comes within ``tolerance`` of the park's edge. The
-                  stretch of the edge inside the park (grown by ``tolerance``) is the
-                  contact interval [start, end] in metres from u, so reaching the park
-                  costs ``start`` from u or ``length - end`` from v. Paths that cross into
-                  the park and sidewalks along it are both covered.
+``edge_contact``  every stretch of an edge inside the park grown by ``tolerance``: paths
+                  that cross into the park, trails inside it, and sidewalks along it.
+                  Each stretch is a contact interval [start, end] in metres from u, so
+                  reaching the park costs ``start`` from u or ``length - end`` from v.
 ``entrance``      an OSM entrance / gate node within ``tolerance`` of the park's edge,
                   unless its ``access`` tag excludes the public; snapped onto its edge.
 
@@ -68,38 +67,48 @@ class AccessResult:
 def _edge_contacts(
     parks: gpd.GeoDataFrame, edges: gpd.GeoDataFrame, tolerance: float
 ) -> gpd.GeoDataFrame:
-    rings = gpd.GeoDataFrame(
-        {"park_id": parks["park_id"]}, geometry=parks.boundary.buffer(tolerance), crs=parks.crs
+    """One row per stretch of an edge that lies in a park grown by ``tolerance``.
+
+    Interior trails count (being on a path inside a park is being in the park), and an
+    edge that touches a park at two separate places gives two rows, not one span from the
+    first touch to the last (that span would wrongly put the street between them "at the
+    park"; found by the Stage 6 network ≥ straight-line invariant).
+    """
+    grown = gpd.GeoDataFrame(
+        {"park_id": parks["park_id"]}, geometry=parks.geometry.buffer(tolerance), crs=parks.crs
     )
-    pairs = gpd.sjoin(edges[["geometry"]], rings, predicate="intersects", how="inner")
+    pairs = gpd.sjoin(edges[["geometry"]], grown, predicate="intersects", how="inner")
     if pairs.empty:
         return gpd.GeoDataFrame(columns=COLUMNS, geometry="geometry", crs=edges.crs)
     edge_pos = pairs.index.to_numpy()
     park_pos = pairs["index_right"].to_numpy()
     lines = np.asarray(edges.geometry.values)[edge_pos]
-    grown = np.asarray(parks.geometry.buffer(tolerance).values)[park_pos]
-    inside = shapely.intersection(lines, grown)
+    inside = shapely.intersection(lines, np.asarray(grown.geometry.values)[park_pos])
 
-    # Contact interval = min / max position along the edge of any point of the contact.
-    coords, owner = shapely.get_coordinates(inside, return_index=True)
-    along = shapely.line_locate_point(lines[owner], shapely.points(coords))
+    # Split each intersection into its separate pieces (lines, or points where it only
+    # touches), then locate each piece's extent along the edge.
+    pieces, pair_of_piece = shapely.get_parts(inside, return_index=True)
+    keep = ~shapely.is_empty(pieces)
+    pieces, pair_of_piece = pieces[keep], pair_of_piece[keep]
+    coords, piece_of_coord = shapely.get_coordinates(pieces, return_index=True)
+    along = shapely.line_locate_point(lines[pair_of_piece[piece_of_coord]], shapely.points(coords))
     span = (
-        pd.DataFrame({"pair": owner, "along": along}).groupby("pair")["along"].agg(["min", "max"])
+        pd.DataFrame({"piece": piece_of_coord, "along": along})
+        .groupby("piece")["along"]
+        .agg(["min", "max"])
     )
-    geom_len = shapely.length(lines)[span.index]
-    length = edges["length_m"].to_numpy()[edge_pos][span.index]
+    pair = pair_of_piece[span.index]
+    geom_len = shapely.length(lines)[pair]
+    length = edges["length_m"].to_numpy()[edge_pos][pair]
     scale = np.where(geom_len > 0, length / geom_len, 0.0)
     start = span["min"].to_numpy() * scale
     end = span["max"].to_numpy() * scale
-    mid = shapely.line_interpolate_point(
-        lines[span.index], (span["min"] + span["max"]).to_numpy() / 2
-    )
+    mid = shapely.line_interpolate_point(lines[pair], (span["min"] + span["max"]).to_numpy() / 2)
 
-    rows = edges.iloc[edge_pos[span.index]].reset_index(drop=True)
-    pid = parks["park_id"].to_numpy()[park_pos[span.index]]
-    return gpd.GeoDataFrame(
+    rows = edges.iloc[edge_pos[pair]].reset_index(drop=True)
+    pid = parks["park_id"].to_numpy()[park_pos[pair]]
+    out = gpd.GeoDataFrame(
         {
-            "access_id": [f"{p}|{e}" for p, e in zip(pid, rows["edge_id"], strict=True)],
             "park_id": pid,
             "method": EDGE_CONTACT,
             "edge_id": rows["edge_id"],
@@ -114,6 +123,11 @@ def _edge_contacts(
         geometry=list(mid),
         crs=edges.crs,
     )
+    # Stretch number k counts from u along the edge, so ids are stable across runs.
+    out = out.sort_values(["park_id", "edge_id", "contact_start_m"], ignore_index=True)
+    k = out.groupby(["park_id", "edge_id"]).cumcount()
+    out.insert(0, "access_id", out["park_id"] + "|" + out["edge_id"] + "#" + k.astype(str))
+    return out
 
 
 def _entrances(

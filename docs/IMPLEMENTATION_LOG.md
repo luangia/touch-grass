@@ -356,3 +356,27 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 - First results: within 800 m, network 85.0% vs straight line 97.2%; median detour 1.35.
 
 **Created:** `docs/learning/stage-06-walking-accessibility.md` (Q1–Q7 pending).
+
+## 2026-11-23 — Stage 6 implemented: walking accessibility
+
+**Approval:** "Approve as recommended" (Q1–Q7, recorded as D-021 plus D-020 amendment 2).
+
+**Added:**
+- `core/routing.py`, `pipeline/analyze.py`, CLI `touchgrass analyze`.
+- Migration `0007_analysis.sql`; the loader loads runs.
+- Stage 5 contact fixes in `core/access.py`.
+- Tests: `test_routing.py`, `test_analyze.py`, +2 network, +1 db. 198 total.
+
+**Verified SciPy behaviour before relying on it:** an explicit zero stays an edge unless `eliminate_zeros()` runs; duplicate entries are summed (3 + 4 → 7).
+
+**Results:** lesson §14. 85.0% within 10 min by network vs 97.2% by straight line; all invariants hold; 1 unreachable block (Hardtack); search 24 ms.
+
+**Housekeeping:** I deleted two development runs (`5fd4a8c77acd5bd3`, `b603963fe2dabbbb`) that I had created minutes earlier from intermediate code, so they wouldn't load as history.
+
+**Not verified:** the route comparison against a web router, asked of you (lesson §14). Nothing committed.
+
+## 2026-11-23 — Route check; access/foot fix (D-020 amendment 3)
+
+- **Your route check:** 289 / 913 / 921 m and 7.0 km. I queried OSRM foot for geometry, sending only the public coordinates (5 requests, one of them with placeholder coordinates sent before I'd read the real destination; its result was ignored). Three samples match our street portion to within 1 m. The fourth started on an `access=no` service road.
+- **Fix:** `WalkFilter` defaults add `access=no` and `foot=private`; `foot_overrides` lets `foot=yes|designated|permissive` beat an `access` closure. Tests +6 cases. 204 total, all passing.
+- **Reran** network → analyze (run `8205a92013b15324`) → load; effects in D-020 amendment 3. Nothing committed.

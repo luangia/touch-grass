@@ -22,8 +22,10 @@ import re
 import time
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
+import geopandas as gpd
 import pandas as pd
 import psycopg
 
@@ -32,6 +34,12 @@ from touchgrass.db import SCHEMA
 from touchgrass.db.migrate import require_current
 from touchgrass.paths import RegionPaths
 from touchgrass.pipeline import sources as src
+from touchgrass.pipeline.analyze import (
+    RUN_FILES,
+    latest_run_id,
+    list_runs,
+    run_freshness_problems,
+)
 from touchgrass.pipeline.network import load_network_outputs, network_freshness_problems
 from touchgrass.pipeline.process import load_outputs, load_stats
 from touchgrass.pipeline.validate import failed, run_validation
@@ -53,6 +61,8 @@ DATA_TABLES = (
     "parks",
     "block_origins",
     "park_access_points",
+    "analysis_runs",
+    "block_access",
 )
 _ACS_COLUMN = re.compile(r"^(b\d{5}[a-i]?)_([em])(\d{3})$")
 
@@ -541,6 +551,88 @@ def _load_access_points(cur: Cursor, region_id: str, points: Any) -> int:
     )
 
 
+def _load_runs(cur: Cursor, region_id: str, run_dirs: list[Path], latest: str | None) -> int:
+    for run_dir in run_dirs:
+        record = json.loads((run_dir / RUN_FILES["run"]).read_text("utf-8"))
+        cur.execute(
+            f"""INSERT INTO {SCHEMA}.analysis_runs
+                  (region_id, run_id, generated_at, params, inputs, code, summary, seconds,
+                   is_latest)
+                VALUES (%s, %s, %s::timestamptz, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb,
+                        %s, %s)""",
+            (
+                region_id,
+                record["run_id"],
+                record["generated_at"],
+                _json(record["params"]),
+                _json(record["inputs"]),
+                _json(record["code"]),
+                _json(record["summary"]),
+                record["seconds"]["total"],
+                record["run_id"] == latest,
+            ),
+        )
+    return len(run_dirs)
+
+
+def _load_block_access(cur: Cursor, region_id: str, run_dirs: list[Path]) -> int:
+    frames = [gpd.read_parquet(d / RUN_FILES["block_access"]) for d in run_dirs]
+    ba = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    if ba.empty:
+        return 0
+    _copy_stage(
+        cur,
+        "stage_block_access",
+        [
+            ("run_id", "text"),
+            ("geoid20", "text"),
+            ("pop20", "int4"),
+            ("snap_status", "text"),
+            ("reachable", "bool"),
+            ("network_m", "float8"),
+            ("walk_min", "float8"),
+            ("straight_m", "float8"),
+            ("straight_park_id", "text"),
+            ("detour_ratio", "float8"),
+            ("nearest_park_id", "text"),
+            ("nearest_access_id", "text"),
+            ("route_kind", "text"),
+            ("wkb", "bytea"),
+        ],
+        zip(
+            _text(ba["run_id"]),
+            _text(ba["geoid20"]),
+            _int(ba["pop20"]),
+            _text(ba["snap_status"]),
+            _bool(ba["reachable"]),
+            _float(ba["network_m"]),
+            _float(ba["walk_min"]),
+            _float(ba["straight_m"]),
+            _text(ba["straight_park_id"]),
+            _float(ba["detour_ratio"]),
+            _text(ba["nearest_park_id"]),
+            _text(ba["nearest_access_id"]),
+            _text(ba["route_kind"]),
+            _wkb(ba),
+            strict=True,
+        ),
+    )
+    return _insert(
+        cur,
+        f"""INSERT INTO {SCHEMA}.block_access
+              (region_id, run_id, geoid20, pop20, snap_status, reachable, network_m, walk_min,
+               straight_m, straight_park_id, detour_ratio, nearest_park_id, nearest_access_id,
+               route_kind, geom)
+            SELECT %(region)s, run_id, geoid20, pop20, snap_status, reachable, network_m,
+                   walk_min, straight_m, straight_park_id, detour_ratio, nearest_park_id,
+                   nearest_access_id, route_kind, ST_GeomFromWKB(wkb, 4326)
+            FROM stage_block_access""",
+        region_id,
+        len(ba),
+        "block_access",
+    )
+
+
 # ------------------------------------------------------------------------- top level
 
 
@@ -585,6 +677,15 @@ def load_region(
         stale = network_freshness_problems(paths.processed)
         if stale:
             raise LoadError(f"network outputs not loadable: {'; '.join(stale)}")
+    run_dirs = list_runs(paths.processed) if network is not None else []
+    latest = latest_run_id(paths.processed) if run_dirs else None
+    if latest is not None:
+        stale_run = run_freshness_problems(paths.processed, latest)
+        if stale_run:
+            raise LoadError(
+                f"latest analysis run not loadable: {'; '.join(stale_run)}; "
+                "run `touchgrass analyze`"
+            )
     acs_vintage = f"{cfg.census.acs.year - 4}-{cfg.census.acs.year}"
 
     result = LoadResult(cfg.region_id)
@@ -635,6 +736,9 @@ def load_region(
                 "park_access_points",
                 lambda: _load_access_points(cur, region, network["park_access_points"]),
             )
+        if run_dirs:
+            step("analysis_runs", lambda: _load_runs(cur, region, run_dirs, latest))
+            step("block_access", lambda: _load_block_access(cur, region, run_dirs))
     result.seconds["transaction"] = time.perf_counter() - started
     say(f"committed in {result.seconds['transaction']:.2f} s")
 

@@ -262,10 +262,12 @@ OSMNX_WALK_EXCLUDE_HIGHWAY = (
 
 
 def _osmnx_walk_exclude_tags() -> TagRule:
+    # OSMnx's rules, except access=no and foot=private are also closures (D-020 amendment 3:
+    # OSMnx keeps `access=no` ways, which OSRM's foot profile and OSM convention exclude).
     return {
         "area": ["yes"],
-        "access": ["private"],
-        "foot": ["no"],
+        "access": ["private", "no"],
+        "foot": ["no", "private"],
         "service": ["private"],
         "sidewalk": ["separate"],
         "sidewalk:both": ["separate"],
@@ -281,10 +283,19 @@ class WalkFilter(_StrictModel):
     its ``highway`` value does not match ``exclude_highway`` (a regex searched anywhere in
     the value, as Overpass ``!~`` does) or it satisfies one of ``readmit`` (every key in
     that entry matches). ``readmit`` cannot override ``exclude_tags``.
+
+    OSM's rule that a mode-specific tag beats the general one applies: an ``exclude_tags``
+    match on a key in ``foot_overrides_keys`` (``access``) is ignored when ``foot`` is in
+    ``foot_overrides`` (``access=private`` + ``foot=designated`` is a public footpath).
     """
 
     exclude_highway: str = Field(default=OSMNX_WALK_EXCLUDE_HIGHWAY, min_length=1)
     exclude_tags: TagRule = Field(default_factory=_osmnx_walk_exclude_tags)
+    foot_overrides: list[str] = Field(
+        default_factory=lambda: ["yes", "designated", "permissive"],
+        description="foot=* values that override an access-based exclusion",
+    )
+    foot_overrides_keys: list[str] = Field(default_factory=lambda: ["access"])
     readmit: list[TagRule] = Field(
         default_factory=list,
         description="Ways excluded by exclude_highway that are walkable after all, e.g. "

@@ -103,11 +103,22 @@ park_access_points (region_id, access_id, park_id, method [edge_contact|entrance
 
 Both locate a point *on* a network edge by its distance from each end; the graph itself (nodes, edges) is GeoParquet only.
 
+**Added in Stage 6** (migration 0007, D-021):
+
+```
+analysis_runs  (region_id, run_id, generated_at, params jsonb, inputs jsonb, code jsonb,
+                summary jsonb, seconds, is_latest)  PK (region_id, run_id); one is_latest per region
+block_access   (region_id, run_id, geoid20, pop20, snap_status, reachable, network_m, walk_min,
+                straight_m, straight_park_id, detour_ratio, nearest_park_id, nearest_access_id,
+                route_kind [via_node|same_edge], geom Point)
+                                                    PK (region_id, run_id, geoid20); FK → analysis_runs
+```
+
 **Indexes:** GiST on every geometry column (plus `census_blocks.rep_point`); B-tree on `analysis_areas (region_id, area_type)`, `area_membership (region_id, geoid20)` and `green_candidates (region_id, reason)`.
 
 **Loading:** `touchgrass load <region>` re-validates the processed outputs, then in one transaction deletes the region (cascade), binary-`COPY`s each table into a temp staging table, and inserts with SQL conversions (WKB → geometry, lon/lat → Point, text → jsonb / text[]). `ANALYZE` runs after commit.
 
-**Planned for later stages** (not built yet): `analysis_runs`, `block_access` and `area_metrics` (Stages 6–7), each following the same `region_id` conventions.
+**Planned for later stages** (not built yet): `area_metrics` (Stage 7), each following the same `region_id` conventions.
 
 **Why not store the walk graph in PostGIS?** We traverse it in Python (NetworkX). Persisting it as GraphML/GeoPackage in `data/processed/` is simpler. Edges may optionally be loaded for display later (pgRouting is a future option).
 
@@ -124,8 +135,8 @@ Both locate a point *on* a network edge by its distance from each end; the graph
 | Graph | pyosmium walk filter (config) → `.osm` XML → `osmnx.graph_from_xml(bidirectional=True)`; clip to buffer; project; undirected; largest component (D-020) | Graph model of networks |
 | Access points | Edge-contact intervals within 15 m of the park ∪ public entrance nodes; else a dry gap ≤ 100 m (D-006 amended) | Spatial intersection, tolerance |
 | Snapping | Nearest **edge** reachable without crossing water (STRtree); connector + offsets to both ends; `snap_status` | Nearest neighbor search, barriers |
-| Distances | `multi_source_dijkstra` from access nodes, cutoff ~2× max threshold | Shortest paths |
-| Straight-line | Nearest park polygon distance (`sjoin_nearest`) | Euclidean proximity |
+| Distances | SciPy `csgraph.dijkstra(min_only=True)` from one node per access point; no cutoff; via u / via v / same-edge (D-021) | Shortest paths |
+| Straight-line | Nearest park polygon (STRtree) from the block point | Euclidean proximity |
 | Aggregate | Population-weighted shares per area | Spatial aggregation, weighting |
 
 Population-weighted share for area *A* and threshold *t*:

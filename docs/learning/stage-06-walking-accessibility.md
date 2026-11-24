@@ -1,6 +1,6 @@
 # Stage 6: Walking Accessibility Analysis
 
-> Status: **prepared, not implemented.** Code snippets show the planned approach.
+> Status: **implemented 2026-11-23, awaiting your review** (including the route check in §14). §13 is what was built, §14 the results, §15 answers to §12.
 > Numbers marked **(measured 2026-11-23)** come from a throwaway prototype run on the real Stage 5 outputs (scratch script outside the repo). No project code was changed.
 
 ## 1. Objective and expected outcome
@@ -214,3 +214,84 @@ Three sample blocks (one downtown, one East Portland, one by the river) get thei
 - SciPy docs: `scipy.sparse.csgraph.dijkstra` (`indices`, `min_only`, `limit`). https://docs.scipy.org/doc/scipy/reference/sparse.csgraph.html
 - NetworkX docs: `multi_source_dijkstra`. https://networkx.org/documentation/stable/
 - Levinson, D. & El-Geneidy, A. (2009). *The minimum circuity frontier and the journey to work.* Regional Science and Urban Economics 39(6). (Circuity, i.e. the detour ratio, in urban networks.)
+
+## 13. What was built (2026-11-23)
+
+| Piece | Where | What it does |
+|---|---|---|
+| Stage 5 fixes | `core/access.py` | One access row per contact stretch (`#k`); interior edges count. Portland: 11,771 → 15,676 access points |
+| Routing | `core/routing.py` | Sparse graph (minimum of parallel edges, explicit zeros kept), one node per access point, `dijkstra(min_only=True)`; per-block distance via u / via v / same-edge |
+| Analysis | `pipeline/analyze.py`, CLI `touchgrass analyze` | Run id from (params, inputs, code); straight-line baseline; detour ratio; 5 hard checks (incl. the NetworkX oracle); summary; 4 sample routes; runs kept in `runs/<run_id>/` |
+| Database | migration `0007_analysis.sql`; `db/load.py` | `analysis_runs`, `block_access`; every run on disk reloaded; a stale latest run refused |
+| Tests | `test_routing.py` (8), `test_analyze.py` (5), +2 in `test_network.py`, +1 in `test_db.py` | Hand-computed graph (via u/v, same edge, unreachable, two parks), parallel-edge sum trap, explicit zero, negative weight, SciPy = NetworkX on a random graph; run identity, rerun bytes, new run on a changed parameter, staleness |
+
+**Bugs hit:** pandas turned `None` into `NaN` in a string Series (fixed with `dtype=object`); the oracle sample was larger than the tiny synthetic graph; a divide-by-zero warning in the detour ratio (`np.divide(where=)`); and I first wrote a muddled route-reconstruction helper, replaced it with a temporary destination node.
+
+## 14. Results on Portland (2026-11-23, run `b586d98bacd40d3f`)
+
+| | |
+|---|---|
+| Run time | **1.0 s** total; the shortest-path search **24 ms** |
+| Invariants | all 5 hard checks pass: **0** blocks shorter than the straight line allows (4 before the Stage 5 fix); SciPy = NetworkX on the sample |
+| Unreachable | 1 block: Hardtack Island (19 people, `isolated`) |
+| Route kinds | 9,706 via a node, **665** straight along their own edge |
+| Within 5 / 10 / 15 min | network **43.7% / 85.0% / 97.5%**; straight line 67.6% / 97.2% / 100.0% |
+| Walking distance | median 434 m per block, **447 m population-weighted**; p90 842 m; max 7,709 m |
+| Detour ratio (straight > 50 m) | median **1.35**, p90 2.05, p99 4.25 (9,780 blocks) |
+
+**The headline:** about 80,000 Portlanders (12 points) look served by a straight-line buffer but aren't within a 10-minute walk on the network.
+
+### Route check for you (acceptance)
+`data/processed/portland-or/runs/b586d98bacd40d3f/analysis_routes.geojson` holds each route's path, start point and destination access point. Compare each with a web router, for example openstreetmap.org → Directions → "Foot (OSRM)" or "Foot (GraphHopper)", from the **from** point to the **to** point:
+
+| Sample | From (lat, lon) | To (lat, lon) | Park | Our walk | Straight |
+|---|---|---|---|---|---|
+| Near the region centre | 45.53975, −122.64995 | 45.53899, −122.65239 | (unnamed park) | 344 m, 4.3 min | 193 m |
+| East, near 10 min | 45.48083, −122.53846 | 45.48572, −122.54193 | Raymond Park | 800 m, 10.0 min | 603 m |
+| Largest detour | 45.48986, −122.69043 | 45.48547, −122.68616 | SW Terwilliger Blvd Parkway | 1,013 m, 12.7 min | 66 m |
+| **Longest walk** | 45.59419, −122.62037 | 45.57593, −122.56660 | (unnamed park) | **7,709 m**, 96 min | 648 m |
+
+Our distance includes the straight connector from the block point to the street (the router does that part its own way), so expect agreement within roughly 50–100 m on the first three. **The longest walk is suspicious:** it's in the airport/Columbia corridor, its nearest street is a service road 192 m away, and it walks 7.7 km for a park 648 m away. Either the area is genuinely cut off, or something like a private airport road is in the network. Please look at it specifically.
+
+**Run identity note:** this run was made from uncommitted code (`dirty: true` with a diff hash in its record). After you commit, rerun `touchgrass analyze` to get a run tied to the clean commit. The rows will be identical; only the run id changes.
+
+## 15. Answers to §12
+
+1. **Negative weights:** Dijkstra settles a node when it's popped, assuming no later path can be cheaper. A negative edge breaks that, because a cheaper path could arrive after settling. Our weights are lengths and offsets. Offsets are `start` and `length − end`, and float noise could make `length − end` = −1e-12, which is why Stage 5 clips it at 0 and `build_routing_graph` rejects negatives outright.
+2. **No virtual sink needed:** the search runs *from* the parks and labels **every** node with its distance to the nearest one. Each block then just reads the two numbers at its edge's ends, a constant-time lookup. A sink would be needed only to ask "from this one block to anywhere", one search per block, which is exactly the 10,000-search approach the virtual source avoids.
+3. **The largest gaps** should be where straight lines cross barriers the network can't: the Willamette and Columbia, I-5 / I-84 / I-205, rail yards, ravines (SW hills), and large industrial or airport land. How to test: map `detour_ratio`, or `network_m − straight_m`, by block and look for clusters along those features, or compare the mean detour of blocks within 300 m of a freeway with the rest. Stage 7 can make this per neighborhood.
+4. **Code version in the run id:** the same parameters and inputs can give different answers if the code changes. For example, the Stage 5 contact fix changed distances for hundreds of blocks with identical inputs. Without the code version, two different results would share one id, and "the same run" would no longer mean the same numbers.
+
+## 16. Your route check (2026-11-23)
+
+You routed the four samples on openstreetmap.org. I then asked the same OSRM foot router for each route's geometry, sending only the two public coordinates. Routers measure from where they snap your point onto a road, so the fair comparison is our distance minus our connector (the straight walk from the block point to the street):
+
+| Sample | You (osm.org) | OSRM foot | Ours minus connector | Verdict |
+|---|---|---|---|---|
+| Near the region centre | 289 m | 314.2 m | 314 m | **exact** |
+| East, near 10 min | 913 m | 784.9 m | 784 m | **exact** (your 913 m was likely another engine or slightly different clicks) |
+| Largest detour | 921 m | 939.3 m | 939 m | **exact** |
+| Longest walk | 7.0 km | 6,893 m from a start snapped **585 m** away | 7,518 m from a service road **192 m** away | **real difference, rule gap** |
+
+**The longest walk is real:** the router also needs about 7 km, because the area by the airport is cut off from the park 648 m away. But the router refused our starting street. That service road (OSM way 484824281) is tagged **`access=no`**, and our walk filter, copied from OSMnx, only excludes `access=private`.
+
+**The rule gap, measured on Portland:**
+- **kept although closed:** 537 ways, 76.4 km, with `access=no` and no foot permission (mostly service roads); 19 of them are also `foot=private`, which nothing excludes;
+- **dropped although open:** 152 ways, 15.5 km, with `access=private` but `foot=designated` or `yes`. In OSM a `foot=*` tag overrides `access` for pedestrians.
+
+**Fixed (D-020 amendment 3, "Apply the fix"):** `access=no` and `foot=private` are closures, and `foot=yes|designated|permissive` overrides an `access` closure.
+
+| | Before | After |
+|---|---|---|
+| Walkable ways | 123,690 | 123,245 |
+| Main network | 8,370 km, 98.40% of nodes | 8,323 km, 98.47% |
+| Pieces | 490 | 476 |
+| Blocks whose distance changed > 1 m | | 35 (20 shorter, 15 longer) |
+| Longest-walk block (410510073001017) | 7,709 m from an `access=no` road | **806 m**: it starts on the Marine Drive Trail 584 m away, like OSRM, and reaches Broughton Beach; OSRM gives 288 m for the street part vs our 222 m |
+| Within 5 / 10 / 15 min | 43.7 / 85.0 / 97.5% | 43.7 / 85.0 / 97.5% |
+
+That block is now **flagged**: its 584 m connector exceeds the 500 m limit. It's 6 people on airport industrial land with no public street nearby, which is the honest answer.
+
+The new latest run is `8205a92013b15324`. The previous run stays as history.
+
+**Lesson:** an independent router found what our own invariants couldn't. The invariants check that the computation is *consistent*; only an external reference checks that the *inputs* (which ways are walkable) are right.

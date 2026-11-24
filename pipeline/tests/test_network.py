@@ -54,13 +54,17 @@ ENTRANCES = {"entrance": ["*"], "barrier": ["gate"]}
         ({"highway": "cycleway", "foot": "designated"}, True, None),  # shared-use path
         ({"highway": "cycleway"}, True, "highway=cycleway"),  # no foot tag: stays out
         # readmit never overrides an exclude tag
-        (
-            {"highway": "cycleway", "foot": "designated", "access": "private"},
-            True,
-            "access=private",
-        ),
+        ({"highway": "cycleway", "foot": "designated", "area": "yes"}, True, "area=yes"),
         ({"highway": "motorway_link"}, True, "highway=motorway_link"),
         ({"highway": "residential", "sidewalk": "separate"}, False, "sidewalk=separate"),
+        # Closures OSMnx misses, and foot=* overriding access (D-020 amendment 3).
+        ({"highway": "service", "access": "no"}, False, "access=no"),
+        ({"highway": "footway", "foot": "private"}, False, "foot=private"),
+        ({"highway": "footway", "access": "private", "foot": "designated"}, False, None),
+        ({"highway": "path", "access": "no", "foot": "yes"}, False, None),
+        ({"highway": "path", "access": "no", "foot": "permissive"}, False, None),
+        # foot overrides access only, not other closures
+        ({"highway": "service", "service": "private", "foot": "yes"}, False, "service=private"),
         ({"highway": "service", "service": "private"}, False, "service=private"),
         ({"highway": "pedestrian", "area": "yes"}, False, "area=yes"),
         ({"name": "no highway"}, False, "no_highway"),
@@ -416,3 +420,34 @@ def test_clip_touching_pieces_are_marked(tmp_path: Path) -> None:
     tight = box(-123.025, 44.99, -123.005, 45.02)
     g2 = build_walk_graph(xml, tight, UTM10)
     assert g2.components[0]["touches_clip"]
+
+
+# -------------------------------------------------- Stage 6 fixes to contact intervals
+
+
+def test_edge_touching_a_park_twice_gives_two_stretches() -> None:
+    # A U-shaped park: the street passes its two arms (x 100-150 and x 250-300), not the gap.
+    park = box(X0 + 100, Y0 - 100, X0 + 150, Y0 + 10).union(
+        box(X0 + 250, Y0 - 100, X0 + 300, Y0 + 10)
+    )
+    parks = gpd.GeoDataFrame(
+        {"park_id": ["osm:w1"], "name": ["U Park"]}, geometry=[park], crs=UTM10
+    )
+    edges = _edges([LineString([(X0, Y0), (X0 + 400, Y0)])])
+    empty = gpd.GeoDataFrame({"osm_node_id": [], "kind": [], "access": []}, geometry=[], crs=UTM10)
+    res = park_access_points(parks, edges, empty, tolerance=15, exclude_access=[])
+    spans = res.points[["contact_start_m", "contact_end_m"]].round(1).values.tolist()
+    assert spans == [[85.0, 165.0], [235.0, 315.0]]  # two stretches, not [85, 315]
+    assert res.points["access_id"].tolist() == ["osm:w1|0-1-0#0", "osm:w1|0-1-0#1"]
+
+
+def test_trail_inside_a_park_counts_as_contact() -> None:
+    big = box(X0 - 1000, Y0 - 1000, X0 + 1000, Y0 + 1000)
+    parks = gpd.GeoDataFrame(
+        {"park_id": ["osm:r1"], "name": ["Big Woods"]}, geometry=[big], crs=UTM10
+    )
+    trail = _edges([LineString([(X0 - 100, Y0), (X0 + 100, Y0)])])  # 900 m from the edge
+    empty = gpd.GeoDataFrame({"osm_node_id": [], "kind": [], "access": []}, geometry=[], crs=UTM10)
+    res = park_access_points(parks, trail, empty, tolerance=15, exclude_access=[])
+    row = res.points.iloc[0]
+    assert (row["method"], row["contact_start_m"], row["contact_end_m"]) == (EDGE_CONTACT, 0, 200)

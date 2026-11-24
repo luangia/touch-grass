@@ -1,6 +1,6 @@
 # Project Plan — TouchGrass
 
-> Status: **Stages 1–5 complete. Stage 6 being prepared** (not approved for implementation). Stages 7–11 not started.
+> Status: **Stages 1–5 complete. Stage 6 implemented (2026-11-23), awaiting review.** Stages 7–11 not started.
 > See [ARCHITECTURE.md](ARCHITECTURE.md) for design and [DECISIONS.md](DECISIONS.md) for the trade-offs behind it.
 
 ## 1. Problem
@@ -180,7 +180,7 @@ Each stage: objective, functional requirements, concepts, dependencies, tasks, d
 
 ### Stage 6 — Walking accessibility analysis
 
-> **Being prepared.** [Lesson](learning/stage-06-walking-accessibility.md); decisions Q1–Q7 pending. The prototype changed parts of the plan below: SciPy instead of NetworkX, no cutoff, a same-edge rule, and two Stage 5 contact fixes found by the invariant.
+> **Implemented 2026-11-23, awaiting review** (route check pending). Decisions in D-021; results in [the lesson](learning/stage-06-walking-accessibility.md) §13–14. The prototype changed parts of the plan below: SciPy instead of NetworkX, no cutoff, a same-edge rule, and two Stage 5 contact fixes found by the invariant.
 
 **Objective.** For every populated block: network distance and time to the nearest park, plus straight-line distance.
 
