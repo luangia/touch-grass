@@ -452,3 +452,20 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 
 **Not verified:** a browser client against the API (Stage 9). Nothing committed. The metrics record shows uncommitted code until Stage 8 is committed and `metrics` rerun.
 
+## 2026-11-23 — Stage 8 committed and complete; Stage 9 prepared (no project code)
+
+**Stage 8:**
+- Committed as `0747c94` (amended once to include `api/.python-version`); `metrics` rerun on the clean commit and reloaded.
+- Verified: api 35 and pipeline 242 tests pass; ruff and mypy clean in both; `/health` ok; tree clean.
+
+**Stage 9 prototype** (a single-file page in scratch, served on :5173 through a temporary `.claude/launch.json` entry, reverted afterwards):
+- OpenFreeMap positron works without a key, and MapLibre shows its attribution automatically. Its ToS: no SLA.
+- MapLibre 6.17 ships only as an ES module; the global-script CDN URL returns 404.
+- Cold style load 8.3 s in the in-app browser; neighborhoods 222 ms; threshold toggle 74 ms; 899 blocks at z13.5.
+- Hover needs `promoteId` (string ids).
+- My prototype's colors made 800–1,200 m look "fine". The lesson now breaks colors at the 10-minute line.
+- Fixed share breaks spread neighborhoods 3/14/14/22/40 at 10 min. Overlapping neighborhoods cover 23.5 km² (5.8%).
+- The browser first failed on `localhost` because the server listened on IPv4 only; binding to `::` fixed it.
+
+**Created:** `docs/learning/stage-09-interactive-map.md` (Q1–Q11 pending).
+

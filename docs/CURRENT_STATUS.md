@@ -6,16 +6,16 @@ _Last updated: 2026-11-23_
 
 | Item | Status |
 |---|---|
-| Phase | **Stages 1–7 complete. Stage 8 implemented (2026-11-23)**, awaiting your review |
-| Completed stages | 1 Foundations · 2 Boundaries & population · 3 Parks · 4 PostGIS · 5 Walk network · 6 Walking accessibility · 7 Neighborhood metrics (2026-11-23) |
-| Current stage | 8: FastAPI backend. [Lesson](learning/stage-08-fastapi-backend.md) §13–16; decisions D-023. Review items in §14 |
+| Phase | **Stages 1–8 complete. Stage 9 being prepared**, not approved for implementation |
+| Completed stages | 1 Foundations · 2 Boundaries & population · 3 Parks · 4 PostGIS · 5 Walk network · 6 Walking accessibility · 7 Neighborhood metrics · 8 API (2026-11-23) |
+| Next stage | 9: Interactive map. [Lesson](learning/stage-09-interactive-map.md). **Not approved for implementation**; decisions pending |
 | Code | `pipeline/`: … + `touchgrass analyze`, `touchgrass metrics`; 242 tests. `api/`: FastAPI, 10 endpoints; 35 tests |
-| Database | schema at migration 0008; portland-or loaded (3 analysis runs; latest `7c1fc6efaf00effa`, metrics regenerated with the Stage 8 caveat change, uncommitted) |
-| Git | `main`, 8 commits ahead of `origin`. Stage 8 implementation uncommitted |
+| Database | schema at migration 0008; portland-or loaded (3 analysis runs; latest `7c1fc6efaf00effa`, metrics on clean commit `0747c94`) |
+| Git | `main`, 9 commits ahead of `origin`. Stage 9 prep docs uncommitted |
 
 ## Currently being worked on
 
-- Stage 8 implemented: all endpoints tested; the dev server runs (`.claude/launch.json` → `api`). Waiting on your review (lesson §14).
+- Stage 9 preparation. Waiting on decisions and implementation approval.
 - ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
@@ -38,8 +38,8 @@ uv run pytest                            # -m data / -m db to select; db tests u
 
 ## Next steps
 
-1. Review Stage 8: try `/docs` (lesson §14).
-2. On approval: commit, rerun `metrics` on the clean commit and reload, then `/learn:advance` to Stage 9 (map).
+1. Answer the Stage 9 decisions (lesson §9).
+2. Approve implementation: `/learn:implement-stage 9`.
 
 ## Blockers / risks being watched
 

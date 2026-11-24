@@ -1,6 +1,6 @@
 # Stage 8: FastAPI Backend
 
-> Status: **implemented 2026-11-23, awaiting your review.** §13 is what was built, §14 the results on Portland, §15 the answers to §12, and §16 where the build departed from the plan.
+> Status: **complete (2026-11-23, commit `0747c94`).** §13 is what was built, §14 the results on Portland, §15 the answers to §12, and §16 where the build departed from the plan.
 > Numbers marked **(prototype 2026-11-23)** come from throwaway SQL run against the loaded dev database (run `7c1fc6efaf00effa`, commit `0b7fd58`) from the scratch area. No project code was changed.
 
 ## 1. Objective and expected outcome

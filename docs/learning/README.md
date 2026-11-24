@@ -11,7 +11,8 @@ Detailed, stage-by-stage technical lessons.
 | 5 | [Pedestrian network & park access points](stage-05-walk-network-access-points.md) — graphs and simplification, the OSMnx walk filter and its biases, connected components, KD-trees/R-trees, edge snapping with offsets, virtual-source Dijkstra, access points; results (§14), field check (§16) | Complete |
 | 6 | [Walking accessibility analysis](stage-06-walking-accessibility.md) — Dijkstra and priority queues, the virtual source, block distances incl. the same-edge case, cutoffs, detour index, invariants, reproducible runs; results (§14), route check (§16) | Complete |
 | 7 | [Neighborhood aggregation & underserved metrics](stage-07-neighborhood-metrics.md) — population weighting, share vs count, overlaps, MAUP, ACS allocation and MOE propagation, reliability, context not cause, priority | Complete |
-| 8 | [FastAPI backend](stage-08-fastapi-backend.md) — REST resources, dependency injection, connection pools, GeoJSON (RFC 7946) and simplification, vector tiles (z/x/y, `ST_AsMVT`), SQL injection and identifiers, caching, CORS | Implemented, awaiting review |
+| 8 | [FastAPI backend](stage-08-fastapi-backend.md) — REST resources, dependency injection, connection pools, GeoJSON (RFC 7946) and simplification, vector tiles (z/x/y, `ST_AsMVT`), SQL injection and identifiers, caching, CORS | Complete |
+| 9 | [Interactive map](stage-09-interactive-map.md) — WebGL maps, sources vs layers, data-driven styling, feature state, classification and colorblind-safe color, React + an imperative map, typed API client, URL state, accessibility | Prepared, not implemented |
 
 ## Deep dives
 

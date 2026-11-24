@@ -108,5 +108,6 @@ Each concept is taught with: **Intuition → Problem → Mechanics → Implement
 - [Stage 5 — Pedestrian network & park access points](learning/stage-05-walk-network-access-points.md) (complete; results §14, field check §16)
 - [Stage 6 — Walking accessibility analysis](learning/stage-06-walking-accessibility.md) (complete; results §14, route check §16)
 - [Stage 7 — Neighborhood aggregation & underserved metrics](learning/stage-07-neighborhood-metrics.md) (complete)
-- [Stage 8 — FastAPI backend](learning/stage-08-fastapi-backend.md) (implemented, awaiting review)
+- [Stage 8 — FastAPI backend](learning/stage-08-fastapi-backend.md) (complete)
+- [Stage 9 — Interactive map](learning/stage-09-interactive-map.md) (prepared)
 - [Deep dive: Coordinate Reference Systems](learning/deep-dive-crs.md)
