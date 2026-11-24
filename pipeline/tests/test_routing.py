@@ -13,6 +13,7 @@ from touchgrass.core.routing import (
     block_distances,
     build_routing_graph,
     nearest_access,
+    parks_within,
 )
 
 #   A ──200── B ──100── C ──50── D        E ──10── F   (separate piece)
@@ -162,3 +163,46 @@ def test_scipy_matches_networkx_on_a_random_graph() -> None:
     theirs = nx.single_source_dijkstra_path_length(h, "S")
     for node, d in ours.items():
         assert d == pytest.approx(theirs.get(node, np.inf))
+
+
+# A second park whose contact stretch covers most of B-C: [10, 90] of 100 m.
+P2 = pd.DataFrame(
+    {
+        "access_id": ["p2|2-3-0#0"],
+        "park_id": ["p2"],
+        "edge_id": ["2-3-0"],
+        "u": [2],
+        "v": [3],
+        "offset_u_m": [10.0],
+        "offset_v_m": [10.0],
+        "contact_start_m": [10.0],
+        "contact_end_m": [90.0],
+        "gap_m": [0.0],
+    }
+)
+
+
+def test_parks_within_per_park_distances() -> None:
+    at_a = pd.DataFrame([origin("1-2-0", 1, 2, 200, 0, 0)])
+    out = parks_within(EDGES, pd.concat([ACCESS, P2]), at_a, 1000).set_index("park_id")
+    assert out.loc["p2", "network_m"] == pytest.approx(210)  # A → B, then 10 m into p2
+    # p1 is 300 m away (A-B-C). Another park's access node joins B and C for 20 m, but
+    # walking through it is not walking B-C: the per-park graph must not contain it.
+    assert out.loc["p1", "network_m"] == pytest.approx(300)
+
+
+def test_parks_within_respects_the_limit_and_matches_nearest() -> None:
+    origins = pd.DataFrame(
+        [origin("1-2-0", 1, 2, 200, 10, 5), origin("3-4-0", 3, 4, 50, 40, 2)]
+    ).assign(geoid20=["g1", "g2"])
+    access = pd.concat([ACCESS, P2])
+    within = parks_within(EDGES, access, origins, 250)
+    assert within[["geoid20", "park_id"]].values.tolist() == [
+        ["g1", "p2"],
+        ["g2", "p1"],
+        ["g2", "p2"],
+    ]
+    nearest = run(origins.to_dict("records"), access=access).set_index("geoid20")["network_m"]
+    best = within.groupby("geoid20")["network_m"].min()
+    assert best.to_dict() == pytest.approx(nearest.to_dict())
+    assert parks_within(EDGES, access.iloc[0:0], origins, 250).empty

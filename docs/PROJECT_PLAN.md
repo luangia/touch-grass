@@ -1,6 +1,6 @@
 # Project Plan — TouchGrass
 
-> Status: **Stages 1–6 complete. Stage 7 being prepared** (not approved for implementation). Stages 8–11 not started.
+> Status: **Stages 1–6 complete. Stage 7 implemented (2026-11-23), awaiting your review.** Stages 8–11 not started.
 > See [ARCHITECTURE.md](ARCHITECTURE.md) for design and [DECISIONS.md](DECISIONS.md) for the trade-offs behind it.
 
 ## 1. Problem
@@ -205,7 +205,7 @@ Each stage: objective, functional requirements, concepts, dependencies, tasks, d
 
 ### Stage 7 — Neighborhood aggregation & underserved metrics
 
-> **Being prepared.** [Lesson](learning/stage-07-neighborhood-metrics.md); decisions Q1–Q8 pending. The prototype adds a precise priority formula (D-011), a reachable-park-area metric, and a fix for ACS allocation at the city line.
+> **Implemented 2026-11-23, awaiting review.** [Lesson](learning/stage-07-neighborhood-metrics.md) (§13 built, §14 results and review items); decisions in D-022 and the D-011 amendment (priority formula). `touchgrass metrics`, migration 0008.
 
 **Objective.** Population-weighted metrics per analysis area, underserved identification, and demographic context.
 

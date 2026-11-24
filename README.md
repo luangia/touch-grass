@@ -19,6 +19,7 @@ uv run touchgrass process portland-or   # offline: GeoParquet + validation repor
 uv run touchgrass db migrate            # create/upgrade the PostGIS schema
 uv run touchgrass network portland-or   # walk graph, block origins, park access points (~2 min)
 uv run touchgrass analyze portland-or   # walking distance from every block to a park (~1 s)
+uv run touchgrass metrics portland-or   # neighborhood metrics, ACS context, report (~9 s)
 uv run touchgrass load portland-or      # load the region (one transaction; rerun-safe)
 uv run pytest                           # db tests use a throwaway touchgrass_test database
 ```

@@ -67,3 +67,29 @@ def test_network_outputs_are_current_and_pass(region_id: str) -> None:
     assert set(origins["geoid20"]) == set(blocks.loc[blocks["pop20"] > 0, "geoid20"])
     parks = load_outputs(paths.processed)["parks"]
     assert set(frames["park_access_points"]["park_id"]) <= set(parks["park_id"])
+
+
+@pytest.mark.skipif(not REGIONS, reason="no processed regions; run `touchgrass process`")
+@pytest.mark.parametrize("region_id", REGIONS)
+def test_latest_metrics_are_current_and_consistent(region_id: str) -> None:
+    import json
+
+    import pandas as pd
+
+    from touchgrass.core.aggregate import CITY_ID
+    from touchgrass.pipeline.analyze import RUNS_DIR, latest_run_id
+    from touchgrass.pipeline.metrics import METRICS_FILES, has_metrics, metrics_freshness_problems
+
+    paths = RegionPaths(region_id, resolve_data_dir(REPO_CONFIG_DIR))
+    run_id = latest_run_id(paths.processed)
+    if run_id is None or not has_metrics(paths.processed / RUNS_DIR / run_id):
+        pytest.skip("no metrics for the latest run; run `touchgrass metrics`")
+    run_dir = paths.processed / RUNS_DIR / run_id
+    assert metrics_freshness_problems(paths.processed, run_id) == []
+    validation = json.loads((run_dir / METRICS_FILES["validation"]).read_text())
+    assert validation["summary"]["hard_failed"] == 0
+    metrics = pd.read_parquet(run_dir / METRICS_FILES["area_metrics"]).set_index("area_id")
+    blocks = load_outputs(paths.processed)["blocks"]
+    assert metrics.loc[CITY_ID, "pop_total"] == blocks["pop20"].sum()
+    areas = load_outputs(paths.processed)["analysis_areas"]
+    assert set(metrics.index) - {CITY_ID} <= set(areas["area_id"])

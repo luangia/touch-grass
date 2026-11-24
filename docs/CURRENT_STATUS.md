@@ -6,21 +6,21 @@ _Last updated: 2026-11-23_
 
 | Item | Status |
 |---|---|
-| Phase | **Stages 1–6 complete. Stage 7 prepared**, awaiting implementation approval |
+| Phase | **Stages 1–6 complete. Stage 7 implemented (2026-11-23)**, awaiting your review |
 | Completed stages | 1 Foundations · 2 Boundaries & population · 3 Parks · 4 PostGIS · 5 Walk network · 6 Walking accessibility (2026-11-23) |
-| Next stage | 7: Neighborhood metrics. [Lesson](learning/stage-07-neighborhood-metrics.md). **Not approved for implementation**; decisions Q1–Q8 pending |
-| Code | `pipeline/`: … + `touchgrass analyze`; 204 tests |
-| Database | schema at migration 0007; portland-or loaded (3 analysis runs; latest `7c1fc6efaf00effa` on clean commit `d3fd91d`) |
-| Git | `main`, 5 commits ahead of `origin`. Stage 7 prep docs uncommitted |
+| Current stage | 7: Neighborhood metrics. [Lesson](learning/stage-07-neighborhood-metrics.md) §13–16; decisions D-022 + D-011 amendment. Review items in §14 |
+| Code | `pipeline/`: … + `touchgrass analyze`, `touchgrass metrics`; 242 tests |
+| Database | schema at migration 0008; portland-or loaded (3 analysis runs; latest `7c1fc6efaf00effa`, with metrics computed from uncommitted Stage 7 code) |
+| Git | `main`, 5 commits ahead of `origin`. Stage 7 prep docs and implementation uncommitted |
 
 ## Currently being worked on
 
-- Stage 7 preparation done. Waiting on decisions Q1–Q8 and implementation approval.
+- Stage 7 implemented: all 8 hard checks pass on Portland. Waiting on your review of the report and the 3 map checks (lesson §14).
 - ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
 
-See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff). Stage 2 added D-015 (data-source choices) and amended D-007 (Census interior points). Stage 3 added D-017 (dated OSM extracts + pyosmium; uv-managed Python) and D-018 (park rules and merging; amendment 2 adds `veto_tags`). Stage 4 added D-019 (COPY loading, SQL migrations, 4326-only storage, long ACS table, test database, settings). Stage 6 added D-021 (SciPy engine, no cutoff, same-edge rule, run ids from content) and fixed two Stage 5 contact bugs. Stage 5 added D-020 (offline OSMnx build, walk filter with shared-use paths re-admitted, largest component plus a report, edge snapping, UTM edge weights) and amended D-006 (no sampled fallback).
+See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff). Stage 2 added D-015 (data-source choices) and amended D-007 (Census interior points). Stage 3 added D-017 (dated OSM extracts + pyosmium; uv-managed Python) and D-018 (park rules and merging; amendment 2 adds `veto_tags`). Stage 4 added D-019 (COPY loading, SQL migrations, 4326-only storage, long ACS table, test database, settings). Stage 6 added D-021 (SciPy engine, no cutoff, same-edge rule, run ids from content) and fixed two Stage 5 contact bugs. Stage 7 added D-022 (areas, rankings, priority, reachable park area, ACS allocation, reliability) and amended D-011 (priority formula). Stage 5 added D-020 (offline OSMnx build, walk filter with shared-use paths re-admitted, largest component plus a report, edge snapping, UTM edge weights) and amended D-006 (no sampled fallback).
 
 ## How to run what exists
 
@@ -30,14 +30,16 @@ uv run touchgrass fetch portland-or      # ~480 MB streamed once, then cached
 uv run touchgrass process portland-or    # offline; writes data/processed/portland-or/
 uv run touchgrass db migrate             # schema (needs `docker compose up -d db`)
 uv run touchgrass network portland-or    # ~2 min; walk graph + origins + access points
+uv run touchgrass analyze portland-or    # ~1 s; distance from every block to the nearest park
+uv run touchgrass metrics portland-or    # ~9 s; area metrics, ACS context, report
 uv run touchgrass load portland-or       # ~3 s; replaces the region atomically
 uv run pytest                            # -m data / -m db to select; db tests use touchgrass_test
 ```
 
 ## Next steps
 
-1. Answer Stage 7 decisions Q1–Q8 (lesson §9).
-2. Approve implementation: `/learn:implement-stage 7`.
+1. Review Stage 7: the report and the three map checks in lesson §14 (North Tabor, Alameda, the two rankings).
+2. On approval: commit, rerun `metrics` on the clean commit, then `/learn:advance` to Stage 8 (API).
 
 ## Blockers / risks being watched
 
@@ -58,7 +60,7 @@ Target bullets (pending implementation):
 - ☐ Built a reproducible geospatial ETL pipeline ingesting US Census (2020 blocks, ACS 5-year), TIGER/Line, and OpenStreetMap data with provenance tracking and automated validation. _(Stages 2–3)_
 - ☑ Computed pedestrian-network walking distance from 10,372 census blocks to the nearest of 15,601 park access points with a multi-source Dijkstra (24 ms), showing 85% of residents within a 10-minute walk vs 97% by straight line (median detour ratio 1.35); verified against OSRM. _(Stages 5–6)_
 - ☑ Designed a multi-region PostGIS schema with GiST-indexed spatial joins, measuring a ~60× speedup via `EXPLAIN ANALYZE`. _(Stage 4)_
-- ☐ Produced population-weighted 5/10/15-minute park-access metrics for ~95 Portland neighborhoods, identifying X residents beyond a 10-minute walk. _(Stage 7)_
+- ☐ Produced population-weighted 5/10/15-minute park-access metrics for 93 neighborhoods and 4 council districts, identifying 97,753 residents beyond a 10-minute walk, with ACS context carrying propagated margins of error and reliability labels. _(Stage 7, pending your review)_
 - ☐ Delivered a typed FastAPI service (GeoJSON + PostGIS-generated vector tiles) and a React/MapLibre interactive map for neighborhood comparison. _(Stages 8–10)_
 - ☐ Architected configuration-driven region onboarding so new cities require only a YAML config and data sources. _(Stages 1–2)_
 

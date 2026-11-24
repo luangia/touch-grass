@@ -9,6 +9,7 @@ never accepts settings that nothing uses:
   Stage 2: study boundary, analysis areas, census vintages/tables, validation targets.
   Stage 3: OSM extract (osm) and park classification rules (parks).
   Stage 5: walk network and park access points (network).
+  Stage 7: area metrics, rankings and ACS context indicators (metrics).
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ Latitude = Annotated[float, Field(ge=-90, le=90)]
 CountyFips = Annotated[str, Field(pattern=r"^\d{3}$")]
 Slug = Annotated[str, Field(pattern=r"^[a-z0-9]+(_[a-z0-9]+)*$")]
 AcsTable = Annotated[str, Field(pattern=r"^B\d{5}[A-I]?$")]
+AcsVariable = Annotated[str, Field(pattern=r"^B\d{5}[A-I]?_\d{3}$")]
 
 
 class _StrictModel(BaseModel):
@@ -351,6 +353,70 @@ class NetworkConfig(_StrictModel):
     min_population_within_100m: float = Field(default=0.95, gt=0, le=1)
 
 
+# ---------------------------------------------------------------------- metrics (Stage 7)
+
+
+class AcsIndicator(_StrictModel):
+    """An ACS indicator reported per area (DECISIONS.md D-022 Q6).
+
+    ``count``: the sum of ``numerator`` variables (e.g. total population).
+    ``share``: sum(numerator) / denominator, or 1 minus that when ``complement`` is set
+    (e.g. people of color = 1 - non-Hispanic white alone / total).
+    Only counts and shares: medians cannot be allocated to areas or summed.
+    """
+
+    id: Slug
+    label: str = Field(min_length=1)
+    kind: Literal["count", "share"]
+    numerator: list[AcsVariable] = Field(
+        min_length=1, description="Variables summed, e.g. B25044_003"
+    )
+    denominator: AcsVariable | None = None
+    complement: bool = False
+
+    @model_validator(mode="after")
+    def _shape(self) -> Self:
+        if self.kind == "share" and self.denominator is None:
+            raise ValueError(f"{self.id}: a share needs a denominator")
+        if self.kind == "count" and (self.denominator is not None or self.complement):
+            raise ValueError(f"{self.id}: a count takes no denominator or complement")
+        if len(set(self.numerator)) != len(self.numerator):
+            raise ValueError(f"{self.id}: duplicate numerator variables")
+        return self
+
+    @property
+    def variables(self) -> list[str]:
+        return [*self.numerator, *([self.denominator] if self.denominator else [])]
+
+
+class MetricsConfig(_StrictModel):
+    """Area aggregation, rankings and ACS context (DECISIONS.md D-011, D-022)."""
+
+    underserved_minutes: PositiveInt = Field(
+        default=10, description="Beyond this walk a block is underserved (D-011); a threshold"
+    )
+    min_residents_for_ranking: int = Field(
+        default=1000, ge=0, description="Share and priority rankings skip smaller areas (D-022 Q2)"
+    )
+    ranking_size: PositiveInt = Field(default=10, le=50, description="Rows per report ranking")
+    cv_high_max: float = Field(default=0.15, gt=0, lt=1, description="CV below this: high")
+    cv_medium_max: float = Field(default=0.30, gt=0, lt=1, description="CV up to this: medium")
+    partition_area_types: list[Slug] = Field(
+        default_factory=list,
+        description="Area types that must cover every resident exactly once (checked, hard)",
+    )
+    indicators: list[AcsIndicator] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Self:
+        if self.cv_high_max >= self.cv_medium_max:
+            raise ValueError("cv_high_max must be below cv_medium_max")
+        ids = [i.id for i in self.indicators]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"indicator ids must be unique, got {ids}")
+        return self
+
+
 # ----------------------------------------------------------------------------- region
 
 
@@ -385,6 +451,32 @@ class RegionConfig(_StrictModel):
     osm: OsmConfig | None = None
     parks: ParksConfig | None = None
     network: NetworkConfig | None = None
+    metrics: MetricsConfig | None = None
+
+    @model_validator(mode="after")
+    def _metrics_consistent(self) -> Self:
+        m = self.metrics
+        if m is None:
+            return self
+        if self.network is None:
+            raise ValueError("'metrics' requires 'network' (metrics aggregate walking distances)")
+        if m.underserved_minutes not in self.analysis.thresholds_min:
+            raise ValueError(
+                f"metrics.underserved_minutes={m.underserved_minutes} is not one of "
+                f"analysis.thresholds_min {self.analysis.thresholds_min}"
+            )
+        overlaps = {a.area_type: a.allow_overlaps for a in self.analysis_areas}
+        for t in m.partition_area_types:
+            if t not in overlaps:
+                raise ValueError(f"metrics.partition_area_types: unknown area type {t!r}")
+            if overlaps[t]:
+                raise ValueError(f"metrics.partition_area_types: {t!r} allows overlaps")
+        tables = set(self.census.acs.tables)
+        for ind in m.indicators:
+            missing = sorted({v.split("_")[0] for v in ind.variables} - tables)
+            if missing:
+                raise ValueError(f"indicator {ind.id!r} uses tables not in census.acs: {missing}")
+        return self
 
     @model_validator(mode="after")
     def _network_needs_parks(self) -> Self:

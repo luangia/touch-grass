@@ -1,6 +1,6 @@
 # Stage 7: Neighborhood Aggregation & Underserved Metrics
 
-> Status: **prepared, not implemented.** Code snippets show the planned approach.
+> Status: **implemented 2026-11-23, awaiting your review** (the review items are in §14). §13 is what was built, §14 the results on Portland, §15 the answers to §12, and §16 where the build departed from the plan.
 > Numbers marked **(prototype 2026-11-23)** come from a throwaway script run on the latest Stage 6 run (`7c1fc6efaf00effa`, commit `d3fd91d`) in the scratch area. No project code was changed. Where the prototype itself was approximate, that's said.
 
 ## 1. Objective and expected outcome
@@ -207,3 +207,71 @@ data/processed/<region>/runs/<run_id>/
 - Openshaw, S. (1984). *The Modifiable Areal Unit Problem.* CATMOG 38.
 - Robinson, W. S. (1950). *Ecological correlations and the behavior of individuals.* American Sociological Review 15(3).
 - Talen, E. & Anselin, L. (1998). *Assessing spatial equity: an evaluation of measures of accessibility to public playgrounds.* Environment and Planning A 30(4).
+
+## 13. What was built (2026-11-23)
+
+| Piece | Where | What it does |
+|---|---|---|
+| Config | `config/models.py` (`MetricsConfig`, `AcsIndicator`); `metrics:` in the region YAML | Underserved threshold, ranking floor (1,000), ranking size, CV cut-offs, partition area types, and ACS indicators as data (count / share / complement). Validated against thresholds, area types and the configured ACS tables |
+| Aggregation | `core/aggregate.py` | One groupby over (area, block) rows plus a `city` group holding every block once. Population-weighted shares per threshold, weighted median walk, underserved count and share, priority, block-share and land-share (for the weighting demonstration), reachable park area |
+| Reachable parks | `core/routing.py` `parks_within` | One bounded Dijkstra per park (`limit` = 800 m) from that park's access points **only**. Other parks' access nodes are left out because they would be shortcuts (§16). 448 searches in 7.7 s |
+| ACS | `core/acs_alloc.py`; `sources/tiger.py` `read_block_population` | Weights f from 2020 block population, with denominators from **all** TIGER blocks (an attribute-only read, < 1 s). Sum, proportion and complement MOEs, the zero-estimate rule, CV and labels. Suppressed values are undefined, not 0 |
+| Pipeline | `pipeline/metrics.py`, CLI `touchgrass metrics` | Needs a fresh latest run. Writes 4 parquet files + run record + validation + `metrics_report.md` into `runs/<run_id>/`. 8 hard checks, 5 info. Freshness check by input checksums |
+| Database | migration `0008_area_metrics.sql`; `db/load.py` | `metrics_runs`, `area_metrics`, `area_thresholds`, `area_context`, `block_park_reach`, all keyed by run. Stale metrics for the latest run are refused |
+| Tests | `test_aggregate.py` (9), `test_acs_alloc.py` (10), `test_metrics.py` (6), +2 `test_routing.py`, +8 `test_config.py`, +2 `test_db.py`, +1 `test_data_portland.py` | Hand-computed weighted answers; overlap counted in each area but once in the city; textbook MOE cases incl. the fallback and the zero rule; a straddling block group; the shortcut trap; partition gap caught; byte-identical reruns; staleness; **SQL recomputes every area's share from `block_access` and agrees** |
+
+**Bugs hit while building:**
+- The report assumed every ACS estimate is defined. The synthetic region's suppressed block group (`-666666666`) crashed it. Undefined estimates now show as *undefined (low)*.
+- A pandas ambiguity: `area_id` was both an index name and a column.
+- The draft caveat text claimed school grounds are excluded from parks. D-018 has no such rule, so the caveat now lists the exclusions from config.
+
+## 14. Results on Portland (2026-11-23, run `7c1fc6efaf00effa`)
+
+All 8 hard checks pass. The run takes 8.6 s, and reruns write byte-identical files. The full report is `data/processed/portland-or/runs/7c1fc6efaf00effa/metrics_report.md`.
+
+| | |
+|---|---|
+| Citywide (from blocks) | 652,503 residents; within 5 / 10 / 15 min **43.7 / 85.0 / 97.5%**; **97,753 underserved**; typical resident's walk **447 m** (population-weighted median); 19 residents with no route (Hardtack Island) |
+| Overlaps | Neighborhoods add up to 666,525 (**+14,022**); council districts add up to exactly 652,503 (partition check) |
+| Lowest share, ≥ 1,000 residents | Sumner 13.9%, Sylvan-Highlands 32.8%, Arnold Creek 50.2%, Maplewood 52.5%, Hayden Island 53.2%, North Tabor 54.1% |
+| Most underserved people | Powellhurst-Gilbert 11,867, Hazelwood 9,428, Centennial 8,460, Cully 3,815, Montavilla 3,669 |
+| Priority (underserved / km² populated land) | **North Tabor 1,709**, Sumner 1,245, Alameda 1,143, Powellhurst-Gilbert 1,103, Richmond 1,092 |
+| Not ranked (< 1,000) | Sunderland 0% (698 residents), Bridgeton 56.0%, and 4 small areas at 100% |
+| Council districts | District 1: 72.6% (43,720 underserved); 3: 85.8%; 2: 88.9%; 4: 92.5%. Neighborhood shares range from 13.9% to 100%, district shares only 72.6–92.5% (MAUP) |
+| Weighting | vs share of blocks: median 1.4 points, **max 44.9 (Bridgeton: 56% of residents but 11% of blocks)**; vs share of land: median 1.5, **max 35.7 (Brooklyn: 99.5% of residents, 63.8% of land)** |
+| Reachable park area (10 min) | City median 4.5 ha; 1,286 blocks reach no park. Alameda and Hollywood have **0 m² inside** yet reach 5.8 and 1.5 ha |
+| ACS (2020–2024) | City 639,274 ± 9,068 residents (allocated), 14% ± 1% car-free households, 34% ± 1% people of color. 59 of 533 block groups straddle the city line |
+| Reliability (97 areas) | total population 92 high / 5 medium / 0 low; people of color 63 / 29 / 5; **zero-vehicle households 16 / 37 / 44** |
+
+**Corrections to the prototype (§4):**
+- **Land-weighted maximum: 35.7 points, not 67.1.** The prototype measured block polygons with water included, and Brooklyn's blocks reach into the Willamette. The build uses Census `ALAND20`, land only.
+- **Straddling block groups: 59, not 168.** The prototype's 168 counted block groups whose in-city 2020 population was below 90% of their *2020–2024 ACS* estimate, which mixes straddling with population change. 59 is the real count: block groups whose city share f < 1.
+- **Zero-vehicle reliability: 44 of 97 areas are low** (CV > 30%). The prototype's "≈ 28 of 93 above 40%" used a simplified MOE.
+
+### Review for you (acceptance)
+1. **Read the report** (path above). Do the two "worst" lists match what you know? The share list is led by hillside and edge neighborhoods; the people list is all East Portland.
+2. **North Tabor tops the priority list** (54.1% within 10 min) although it borders Mt. Tabor Park. It's either real (the north of the neighborhood is far from the park's entrances and up the hill) or a missing path at the park's north edge. Please check it on the map, as you did for Stage 5: is there a way into Mt. Tabor Park from the north (around SE Yamhill / Salmon) that a resident would use?
+3. **Alameda: 0 m² of park inside, 66.7% within 10 min.** Does that fit how Alameda residents reach Wilshire and Grant Parks?
+
+## 15. Answers to §12
+1. **Sunderland vs Powellhurst-Gilbert.** Sunderland is worse served *as a rate*: nobody there is within 10 minutes. Powellhurst-Gilbert has the larger *need*: 11,867 people, 17 times Sunderland's whole population. A rate ranking supports equity arguments ("this place is left out"). A count ranking supports where a new park would help the most people. The report ranks both.
+2. **Why the populations don't add up.** Neighborhood associations share territory, so a block in a shared area belongs to both, and adding up neighborhoods counts its residents twice (+14,022 here). One example: blocks in the overlap that two neighborhood associations both claim. Each association reports them, and both are right.
+3. **9% ± 7%:** CV = (0.07 / 1.645) / 0.09 ≈ **47%**, so it's low reliability. Don't rank on it. The interval runs from 2% to 16%, which covers most of the city's range.
+4. **Car-free households and park access, +0.27 across neighborhoods** (+0.29 using only the 49 neighborhoods whose estimate isn't low reliability). A non-causal explanation: older, denser inner neighborhoods were built with both streetcar-era parks and transit. Density drives both. The ecological fallacy: a neighborhood-level association says nothing about whether car-free *households* live nearer parks than others in the same neighborhood.
+
+## 16. Departures from the plan
+- **Tables:** `area_metrics` holds one row per area. Per-threshold shares moved to `area_thresholds` instead of repeating every per-area value on three threshold rows. `metrics_runs` (provenance) and `block_park_reach` (per block, for the Stage 9 map) were added.
+- **Reachable park area:** this is a population-weighted **median** (and mean) of the park area each block can reach, not "m² per resident". The planned name described a different quantity. The median is reported because a single block reaching Forest Park (2,000+ ha) would dominate a mean.
+- **The shortcut trap (new):** in the per-park search, another park's access node joins its edge's ends for *less* than the edge's length (it skips the contact stretch). As a pass-through node it would be a free shortcut. The Stage 6 search was immune because every access node was a source at distance 0. A test pins it.
+- **Zero-estimate MOE rule (new):** when many block groups have "0 ± 13", summing all their MOEs inflates the result. The *ACS Handbook* counts only the largest one, and so does the build.
+- **Suppressed ACS values** (Census annotations) make an area's estimate *undefined*, labelled low, not 0. Portland has none in the three indicators; the synthetic test region does.
+- **Partition check** is configured (`partition_area_types`), not assumed. Neighborhoods don't cover the city (the unclaimed areas were excluded in Stage 2), so it applies to council districts only.
+
+
+## 17. Your field check (2026-11-23)
+- **Alameda:** you confirmed Wilshire Park is next door and its entrance is accessible. That matches the model (66.7% within 10 min, with no park inside its boundary).
+- **North Tabor:** you reported access to Mt. Tabor Park on SE Yamhill and suspected the walk network misses it. The data says the network **does** have it, and the low share comes from distance:
+  - Mt. Tabor Park has 485 access points. The northern ones sit on SE Yamhill Street and SE Yamhill Court, and the routes from North Tabor's nearest blocks end at a Yamhill access point.
+  - North Tabor's populated blocks all lie north of about E Burnside, at least **745 m in a straight line** from the park's edge (median 1,248 m). Only 2.6% of its residents are within 800 m of the park even as the crow flies. By the network, the walk is 1,057 m at best (detour ratio 1.3–1.7, typical for the city).
+  - The 54.1% who *are* within 10 minutes reach smaller parks: Frazer Park, Rosemont Bluff Natural Area, Normandale, Laurelhurst and Coe Circle.
+  - **No change made.** North Tabor's priority rank is real: dense blocks between Burnside and I-84 sit more than a 10-minute walk from any park.

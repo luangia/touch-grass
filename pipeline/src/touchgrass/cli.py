@@ -39,6 +39,7 @@ from touchgrass.db.load import load_region as db_load_region
 from touchgrass.paths import RegionPaths, resolve_data_dir
 from touchgrass.pipeline.analyze import run_analysis
 from touchgrass.pipeline.fetch import run_fetch
+from touchgrass.pipeline.metrics import METRICS_FILES, run_metrics
 from touchgrass.pipeline.network import run_network
 from touchgrass.pipeline.process import MissingDataError, load_outputs, load_stats, run_process
 from touchgrass.pipeline.validate import Check, failed, run_validation, write_report
@@ -369,3 +370,32 @@ def analyze_cmd(
     )
     assert result.run_dir is not None
     _print_checks(result.checks, result.run_dir / "analysis_validation.json")
+
+
+# ------------------------------------------------------------------- Stage 7: metrics
+
+
+@app.command("metrics")
+def metrics_cmd(
+    region: Annotated[str, typer.Argument(help="Region id.")],
+    config_dir: ConfigDirOption = None,
+    data_dir: DataDirOption = None,
+) -> None:
+    """Area metrics, rankings and ACS context for the latest analysis run."""
+    cfg, paths = _region_and_paths(region, config_dir, data_dir)
+    repo = (config_dir or find_config_dir()).parent
+    try:
+        result = run_metrics(cfg, paths, repo, progress=lambda m: typer.echo(f"→ {m}"))
+    except MissingDataError as err:
+        typer.secho(f"✗ {err}", fg="red", err=True)
+        raise typer.Exit(code=1) from err
+    s = result.record["summary"]
+    typer.echo(f"\nrun {result.run_id}  ({result.record['seconds']['total']} s)")
+    typer.echo(
+        f"city: {s['population']:,} residents; underserved {s['underserved_pop']:,}; areas "
+        + ", ".join(f"{n} {t}" for t, n in s["areas"].items())
+        + f" ({s['ranked_areas']} ranked)"
+    )
+    assert result.run_dir is not None
+    typer.echo(f"report: {result.run_dir / METRICS_FILES['report']}\n")
+    _print_checks(result.checks, result.run_dir / METRICS_FILES["validation"])

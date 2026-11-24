@@ -148,3 +148,29 @@ network:
       - highway: [cycleway]
         foot: [designated, "yes", permissive]
   access_tolerance_m: 15 # network this close to a park edge reaches the park (D-006)
+
+# Area metrics and ACS context (Stage 7, D-011, D-022).
+metrics:
+  underserved_minutes: 10 # beyond a 10-minute walk = underserved (D-011)
+  min_residents_for_ranking: 1000 # share/priority rankings skip smaller areas (D-022 Q2)
+  ranking_size: 10
+  cv_high_max: 0.15 # reliability labels from the ACS coefficient of variation (D-022 Q7)
+  cv_medium_max: 0.30
+  # Council districts were drawn from 2020 blocks: every resident in exactly one.
+  partition_area_types: [council_district]
+  indicators:
+    - id: total_population
+      label: Total population (ACS)
+      kind: count
+      numerator: [B01003_001]
+    - id: zero_vehicle_households
+      label: Households with no vehicle
+      kind: share
+      numerator: [B25044_003, B25044_010] # owner- and renter-occupied, no vehicle
+      denominator: B25044_001
+    - id: people_of_color
+      label: People of color (all except non-Hispanic white alone)
+      kind: share
+      numerator: [B03002_003] # non-Hispanic white alone
+      denominator: B03002_001
+      complement: true

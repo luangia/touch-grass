@@ -393,3 +393,51 @@ def test_load_includes_analysis_runs(db: Conn, tmp_path: Path) -> None:
     dbload.load_region(db, cfg, paths)
     n = db.execute("SELECT count(DISTINCT run_id) FROM touchgrass.block_access").fetchone()
     assert n == (2,) and first.run_id != second.run_id
+
+
+def _metrics_region(tmp_path: Path) -> tuple[RegionConfig, Any]:
+    from touchgrass.pipeline.analyze import run_analysis
+    from touchgrass.pipeline.metrics import run_metrics
+    from touchgrass.pipeline.network import run_network
+
+    from .test_metrics import with_metrics
+    from .test_network import build_network_region
+
+    cfg, paths = build_network_region(tmp_path)
+    run_network(cfg, paths)
+    run_analysis(cfg, paths, repo=tmp_path)
+    cfg = with_metrics(cfg)
+    run_metrics(cfg, paths, repo=tmp_path)
+    return cfg, paths
+
+
+def test_load_includes_metrics_and_sql_agrees(db: Conn, tmp_path: Path) -> None:
+    cfg, paths = _metrics_region(tmp_path)
+    loaded = dbload.load_region(db, cfg, paths)
+    assert loaded.rows["metrics_runs"] == 1 and loaded.rows["area_metrics"] == 5  # 4 + city
+    assert loaded.rows["area_thresholds"] == 15 and loaded.rows["block_park_reach"] == 3
+    # Recompute every area's 10-minute share in SQL from block_access + area_membership.
+    rows = db.execute(
+        """SELECT t.area_id, t.pct_within,
+                  sum(b.pop20) FILTER (WHERE b.network_m <= t.threshold_m)::float
+                      / sum(b.pop20) AS sql_pct
+           FROM touchgrass.area_thresholds t
+           JOIN touchgrass.area_membership m USING (region_id, area_id)
+           JOIN touchgrass.block_access b
+             ON b.region_id = t.region_id AND b.run_id = t.run_id AND b.geoid20 = m.geoid20
+           WHERE t.threshold_min = 10
+           GROUP BY t.area_id, t.pct_within"""
+    ).fetchall()
+    assert len(rows) == 4
+    for _area, pct, sql_pct in rows:
+        assert pct == pytest.approx(sql_pct)
+
+
+def test_load_refuses_stale_metrics(db: Conn, tmp_path: Path) -> None:
+    import pandas as pd
+
+    cfg, paths = _metrics_region(tmp_path)
+    path = paths.processed / "area_membership.parquet"
+    pd.read_parquet(path).iloc[:-1].to_parquet(path, index=False)
+    with pytest.raises(dbload.LoadError, match="metrics of the latest run not loadable"):
+        dbload.load_region(db, cfg, paths)

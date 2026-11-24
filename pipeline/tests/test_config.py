@@ -186,3 +186,60 @@ def test_duplicate_area_types_rejected(chicago_dict: dict[str, Any]) -> None:
     chicago_dict["analysis_areas"] = chicago_dict["analysis_areas"] * 2
     with pytest.raises(ValidationError, match="area_type values must be unique"):
         RegionConfig.model_validate(chicago_dict)
+
+
+def _with_metrics(**metrics: Any) -> dict[str, Any]:
+    data = load_region("portland-or", REPO_CONFIG_DIR).model_dump(mode="json")
+    data["metrics"] = {**data["metrics"], **metrics}
+    return data
+
+
+@pytest.mark.parametrize(
+    ("metrics", "match"),
+    [
+        ({"underserved_minutes": 12}, "not one of analysis.thresholds_min"),
+        ({"partition_area_types": ["neighborhood"]}, "allows overlaps"),
+        ({"partition_area_types": ["ward"]}, "unknown area type"),
+        ({"cv_high_max": 0.3, "cv_medium_max": 0.2}, "cv_high_max must be below"),
+        (
+            {
+                "indicators": [
+                    {"id": "x", "label": "X", "kind": "count", "numerator": ["B99999_001"]}
+                ]
+            },
+            "tables not in census.acs",
+        ),
+        (
+            {
+                "indicators": [
+                    {"id": "x", "label": "X", "kind": "share", "numerator": ["B01003_001"]}
+                ]
+            },
+            "needs a denominator",
+        ),
+        (
+            {
+                "indicators": [
+                    {
+                        "id": "x",
+                        "label": "X",
+                        "kind": "count",
+                        "numerator": ["B01003_001"],
+                        "complement": True,
+                    }
+                ]
+            },
+            "takes no denominator or complement",
+        ),
+    ],
+)
+def test_metrics_config_rules(metrics: dict[str, Any], match: str) -> None:
+    with pytest.raises(ValidationError, match=match):
+        RegionConfig.model_validate(_with_metrics(**metrics))
+
+
+def test_metrics_requires_network() -> None:
+    data = _with_metrics()
+    data["network"] = None
+    with pytest.raises(ValidationError, match="'metrics' requires 'network'"):
+        RegionConfig.model_validate(data)

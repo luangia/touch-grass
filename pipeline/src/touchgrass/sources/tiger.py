@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Literal
 
 import geopandas as gpd
+import pandas as pd
 import pyogrio
 
 TIGER_BASE = "https://www2.census.gov/geo/tiger"
@@ -43,3 +44,21 @@ def read_counties(path: Path, layer: TigerLayer, county_fips: list[str]) -> gpd.
     if gdf.crs is None or gdf.crs.to_epsg() != TIGER_CRS:
         raise ValueError(f"{path.name}: expected EPSG:{TIGER_CRS}, got {gdf.crs}")
     return gdf
+
+
+def read_block_population(path: Path, county_fips: list[str]) -> pd.DataFrame:
+    """GEOID20 and POP20 of every 2020 block in the given counties, without geometry.
+
+    Used for the *full* 2020 population of block groups that straddle the study boundary
+    (ACS allocation denominators, DECISIONS.md D-022 Q5). Attribute-only: about 1 s.
+    """
+    in_list = ", ".join(f"'{c}'" for c in county_fips)
+    df = pyogrio.read_dataframe(
+        path,
+        columns=["GEOID20", "COUNTYFP20", "POP20"],  # the WHERE field must be read too
+        read_geometry=False,
+        where=f"COUNTYFP20 IN ({in_list})",
+    )
+    return pd.DataFrame(
+        {"geoid20": df["GEOID20"].astype(str), "pop20": df["POP20"].astype("int64")}
+    )

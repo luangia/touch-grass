@@ -36,10 +36,12 @@ from touchgrass.paths import RegionPaths
 from touchgrass.pipeline import sources as src
 from touchgrass.pipeline.analyze import (
     RUN_FILES,
+    RUNS_DIR,
     latest_run_id,
     list_runs,
     run_freshness_problems,
 )
+from touchgrass.pipeline.metrics import METRICS_FILES, has_metrics, metrics_freshness_problems
 from touchgrass.pipeline.network import load_network_outputs, network_freshness_problems
 from touchgrass.pipeline.process import load_outputs, load_stats
 from touchgrass.pipeline.validate import failed, run_validation
@@ -63,6 +65,11 @@ DATA_TABLES = (
     "park_access_points",
     "analysis_runs",
     "block_access",
+    "metrics_runs",
+    "area_metrics",
+    "area_thresholds",
+    "area_context",
+    "block_park_reach",
 )
 _ACS_COLUMN = re.compile(r"^(b\d{5}[a-i]?)_([em])(\d{3})$")
 
@@ -633,6 +640,182 @@ def _load_block_access(cur: Cursor, region_id: str, run_dirs: list[Path]) -> int
     )
 
 
+# ---------------------------------------------------------------- Stage 7: metrics
+
+
+def _concat(run_dirs: list[Path], key: str) -> pd.DataFrame:
+    frames = [pd.read_parquet(d / METRICS_FILES[key]) for d in run_dirs]
+    frames = [f for f in frames if len(f)]
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def _load_metrics_runs(cur: Cursor, region_id: str, run_dirs: list[Path]) -> int:
+    for run_dir in run_dirs:
+        record = json.loads((run_dir / METRICS_FILES["run"]).read_text("utf-8"))
+        cur.execute(
+            f"""INSERT INTO {SCHEMA}.metrics_runs
+                  (region_id, run_id, generated_at, params, inputs, code, summary)
+                VALUES (%s, %s, %s::timestamptz, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb)""",
+            (
+                region_id,
+                record["run_id"],
+                record["generated_at"],
+                _json(record["params"]),
+                _json(record["inputs"]),
+                _json(record["code"]),
+                _json(record["summary"]),
+            ),
+        )
+    return len(run_dirs)
+
+
+def _load_area_metrics(cur: Cursor, region_id: str, run_dirs: list[Path]) -> int:
+    am = _concat(run_dirs, "area_metrics")
+    if am.empty:
+        return 0
+    floats = [
+        "populated_land_m2",
+        "underserved_share",
+        "median_walk_m",
+        "priority_score",
+        "block_share_within",
+        "land_share_within",
+        "reachable_park_ha_mean",
+        "reachable_park_ha_median",
+        "park_m2_inside",
+        "park_m2_inside_per_resident",
+    ]
+    ints = ["blocks", "pop_total", "unreachable_pop", "underserved_pop"]
+    texts = ["run_id", "area_id", "area_type", "name"]
+    cols = [*texts, *ints, *floats, "ranked"]
+    _copy_stage(
+        cur,
+        "stage_area_metrics",
+        [(c, "text") for c in texts]
+        + [(c, "int4") for c in ints]
+        + [(c, "float8") for c in floats]
+        + [("ranked", "bool")],
+        zip(
+            *[_text(am[c]) for c in texts],
+            *[_int(am[c]) for c in ints],
+            *[_float(am[c]) for c in floats],
+            _bool(am["ranked"]),
+            strict=True,
+        ),
+    )
+    names = ", ".join(cols)
+    return _insert(
+        cur,
+        f"""INSERT INTO {SCHEMA}.area_metrics (region_id, {names})
+            SELECT %(region)s, {names} FROM stage_area_metrics""",
+        region_id,
+        len(am),
+        "area_metrics",
+    )
+
+
+def _load_area_thresholds(cur: Cursor, region_id: str, run_dirs: list[Path]) -> int:
+    at = _concat(run_dirs, "area_thresholds")
+    if at.empty:
+        return 0
+    _copy_stage(
+        cur,
+        "stage_area_thresholds",
+        [
+            ("run_id", "text"),
+            ("area_id", "text"),
+            ("threshold_min", "int4"),
+            ("threshold_m", "float8"),
+            ("pop_within", "int4"),
+            ("pct_within", "float8"),
+        ],
+        zip(
+            _text(at["run_id"]),
+            _text(at["area_id"]),
+            _int(at["threshold_min"]),
+            _float(at["threshold_m"]),
+            _int(at["pop_within"]),
+            _float(at["pct_within"]),
+            strict=True,
+        ),
+    )
+    return _insert(
+        cur,
+        f"""INSERT INTO {SCHEMA}.area_thresholds
+              (region_id, run_id, area_id, threshold_min, threshold_m, pop_within, pct_within)
+            SELECT %(region)s, run_id, area_id, threshold_min, threshold_m, pop_within,
+                   pct_within
+            FROM stage_area_thresholds""",
+        region_id,
+        len(at),
+        "area_thresholds",
+    )
+
+
+def _load_area_context(cur: Cursor, region_id: str, run_dirs: list[Path]) -> int:
+    ac = _concat(run_dirs, "area_context")
+    if ac.empty:
+        return 0
+    texts = ["run_id", "area_id", "indicator", "kind", "reliability", "acs_vintage"]
+    floats = [
+        "estimate",
+        "moe",
+        "cv",
+        "numerator",
+        "numerator_moe",
+        "denominator",
+        "denominator_moe",
+    ]
+    _copy_stage(
+        cur,
+        "stage_area_context",
+        [(c, "text") for c in texts] + [(c, "float8") for c in floats],
+        zip(*[_text(ac[c]) for c in texts], *[_float(ac[c]) for c in floats], strict=True),
+    )
+    names = ", ".join([*texts, *floats])
+    return _insert(
+        cur,
+        f"""INSERT INTO {SCHEMA}.area_context (region_id, {names})
+            SELECT %(region)s, {names} FROM stage_area_context""",
+        region_id,
+        len(ac),
+        "area_context",
+    )
+
+
+def _load_block_park_reach(cur: Cursor, region_id: str, run_dirs: list[Path]) -> int:
+    br = _concat(run_dirs, "block_park_reach")
+    if br.empty:
+        return 0
+    _copy_stage(
+        cur,
+        "stage_block_park_reach",
+        [
+            ("run_id", "text"),
+            ("geoid20", "text"),
+            ("parks_reachable", "int4"),
+            ("reachable_park_ha", "float8"),
+        ],
+        zip(
+            _text(br["run_id"]),
+            _text(br["geoid20"]),
+            _int(br["parks_reachable"]),
+            _float(br["reachable_park_ha"]),
+            strict=True,
+        ),
+    )
+    return _insert(
+        cur,
+        f"""INSERT INTO {SCHEMA}.block_park_reach
+              (region_id, run_id, geoid20, parks_reachable, reachable_park_ha)
+            SELECT %(region)s, run_id, geoid20, parks_reachable, reachable_park_ha
+            FROM stage_block_park_reach""",
+        region_id,
+        len(br),
+        "block_park_reach",
+    )
+
+
 # ------------------------------------------------------------------------- top level
 
 
@@ -685,6 +868,14 @@ def load_region(
             raise LoadError(
                 f"latest analysis run not loadable: {'; '.join(stale_run)}; "
                 "run `touchgrass analyze`"
+            )
+    metric_dirs = [d for d in run_dirs if has_metrics(d)]
+    if latest is not None and has_metrics(paths.processed / RUNS_DIR / latest):
+        stale_metrics = metrics_freshness_problems(paths.processed, latest)
+        if stale_metrics:
+            raise LoadError(
+                f"metrics of the latest run not loadable: {'; '.join(stale_metrics)}; "
+                "run `touchgrass metrics`"
             )
     acs_vintage = f"{cfg.census.acs.year - 4}-{cfg.census.acs.year}"
 
@@ -739,6 +930,12 @@ def load_region(
         if run_dirs:
             step("analysis_runs", lambda: _load_runs(cur, region, run_dirs, latest))
             step("block_access", lambda: _load_block_access(cur, region, run_dirs))
+        if metric_dirs:
+            step("metrics_runs", lambda: _load_metrics_runs(cur, region, metric_dirs))
+            step("area_metrics", lambda: _load_area_metrics(cur, region, metric_dirs))
+            step("area_thresholds", lambda: _load_area_thresholds(cur, region, metric_dirs))
+            step("area_context", lambda: _load_area_context(cur, region, metric_dirs))
+            step("block_park_reach", lambda: _load_block_park_reach(cur, region, metric_dirs))
     result.seconds["transaction"] = time.perf_counter() - started
     say(f"committed in {result.seconds['transaction']:.2f} s")
 

@@ -10,7 +10,7 @@ Detailed, stage-by-stage technical lessons.
 | 4 | [PostGIS database & spatial SQL](stage-04-postgis-spatial-sql.md) — geometry vs geography, SRID typmods, GiST/R-tree internals, filter-and-refine, reading query plans, multi-region schema, migrations, COPY loading; measured plans (§14) | Complete |
 | 5 | [Pedestrian network & park access points](stage-05-walk-network-access-points.md) — graphs and simplification, the OSMnx walk filter and its biases, connected components, KD-trees/R-trees, edge snapping with offsets, virtual-source Dijkstra, access points; results (§14), field check (§16) | Complete |
 | 6 | [Walking accessibility analysis](stage-06-walking-accessibility.md) — Dijkstra and priority queues, the virtual source, block distances incl. the same-edge case, cutoffs, detour index, invariants, reproducible runs; results (§14), route check (§16) | Complete |
-| 7 | [Neighborhood aggregation & underserved metrics](stage-07-neighborhood-metrics.md) — population weighting, share vs count, overlaps, MAUP, ACS allocation and MOE propagation, reliability, context not cause, priority | Prepared, not implemented |
+| 7 | [Neighborhood aggregation & underserved metrics](stage-07-neighborhood-metrics.md) — population weighting, share vs count, overlaps, MAUP, ACS allocation and MOE propagation, reliability, context not cause, priority | Implemented, awaiting review |
 
 ## Deep dives
 

@@ -60,7 +60,8 @@ TouchGrass is a classic **batch-analysis + read-only serving** GIS system. The e
 3. **Clean**: reproject to the region's analysis CRS, fix invalid geometries (`make_valid`), dissolve multi-part parks, classify parks by tag rules, drop excluded types, join population to blocks by GEOID. Output GeoParquet in `data/processed/<region>/`.
 4. **Validate**: assertion checks (row counts, CRS, population totals vs. published totals, no null geometries, parks inside buffer).
 5. **Load** into PostGIS (stored in EPSG:4326, plus an analysis-CRS geometry column where useful).
-6. **Analyze**: build walk graph → derive park access nodes → multi-source Dijkstra → per-block network + straight-line distance → write `block_access` → aggregate to `area_metrics`.
+6. **Analyze**: build walk graph → derive park access nodes → multi-source Dijkstra → per-block network + straight-line distance → write `block_access`.
+7. **Metrics** (Stage 7): per-park bounded searches (reachable park area) → population-weighted aggregation by area (+ city from blocks) → ACS allocation by 2020 block population with MOE and reliability → `area_metrics`, `area_thresholds`, `area_context`, report.
 7. **Serve**: API reads tables; frontend renders.
 
 ## 4. Database design
@@ -118,7 +119,27 @@ block_access   (region_id, run_id, geoid20, pop20, snap_status, reachable, netwo
 
 **Loading:** `touchgrass load <region>` re-validates the processed outputs, then in one transaction deletes the region (cascade), binary-`COPY`s each table into a temp staging table, and inserts with SQL conversions (WKB → geometry, lon/lat → Point, text → jsonb / text[]). `ANALYZE` runs after commit.
 
-**Planned for later stages** (not built yet): `area_metrics` (Stage 7), each following the same `region_id` conventions.
+**Added in Stage 7** (migration 0008, D-022). Keyed by analysis run; the `city` row (area_type `city`) is computed from blocks, never by summing areas:
+
+```
+metrics_runs      (region_id, run_id, generated_at, params, inputs, code, summary jsonb)
+                                                    PK (region_id, run_id); FK → analysis_runs
+area_metrics      (region_id, run_id, area_id, area_type, name, blocks, pop_total,
+                   populated_land_m2, unreachable_pop, underserved_pop, underserved_share,
+                   median_walk_m, priority_score, block_share_within, land_share_within,
+                   reachable_park_ha_mean, reachable_park_ha_median, park_m2_inside,
+                   park_m2_inside_per_resident, ranked)
+                                                    PK (region_id, run_id, area_id); FK → metrics_runs
+area_thresholds   (region_id, run_id, area_id, threshold_min, threshold_m, pop_within, pct_within)
+                                                    PK (…, area_id, threshold_min); FK → area_metrics
+area_context      (region_id, run_id, area_id, indicator, kind [count|share], estimate, moe, cv,
+                   reliability [high|medium|low], numerator(_moe), denominator(_moe), acs_vintage)
+                                                    PK (…, area_id, indicator); FK → area_metrics
+block_park_reach  (region_id, run_id, geoid20, parks_reachable, reachable_park_ha)
+                                                    PK (…, geoid20); FK → block_access
+```
+
+No foreign keys to the *current* `analysis_areas`, for the same reason as `block_access`: a historical run keeps the areas it was computed with.
 
 **Why not store the walk graph in PostGIS?** We traverse it in Python (NetworkX). Persisting it as GraphML/GeoPackage in `data/processed/` is simpler. Edges may optionally be loaded for display later (pgRouting is a future option).
 

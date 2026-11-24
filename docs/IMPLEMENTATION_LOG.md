@@ -395,3 +395,29 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 - My prototype's proportion-MOE formula was simplified, so the reliability count (~28 of 93 with CV > 40%) is rough.
 
 **Created:** `docs/learning/stage-07-neighborhood-metrics.md` (Q1–Q8 pending).
+
+## 2026-11-23 — Stage 7 implemented (approved "Approve as recommended", Q1–Q8)
+
+**Decisions:** D-022 (Q1–Q8) and the D-011 amendment (priority = underserved residents per km² of populated-block land).
+
+**Built:** lesson §13.
+- Modules: `core/aggregate.py`, `core/acs_alloc.py`, `routing.parks_within`, `tiger.read_block_population`, `pipeline/metrics.py`.
+- CLI `touchgrass metrics`; config `metrics:` section; migration 0008 + loader.
+- Tests: +38, 242 in total. Ruff and mypy clean.
+
+**Verified before building on it:**
+- The per-park bounded search reproduces Stage 6's nearest-park distance exactly (max difference 0.0 m, 9,086 blocks).
+- Reading TIGER block attributes without geometry takes < 1 s. GDAL's WHERE field must be among the read columns, or it silently returns 0 rows; this caught me once.
+
+**Results (lesson §14):**
+- All 8 hard checks pass; reruns are byte-identical.
+- 97,753 underserved; North Tabor tops the priority list.
+- Three prototype figures corrected:
+  - land-weighting max 35.7 points, not 67.1 (water was included);
+  - 59 straddling block groups, not 168;
+  - zero-vehicle reliability low in 44 of 97 areas.
+
+**Bugs hit:** undefined (suppressed) ACS estimates crashed the report; an index/column name clash; a draft caveat that misstated the park rules.
+
+**Not verified:** the North Tabor and Alameda results against the map (asked of you, lesson §14). The metrics record shows uncommitted code (`dirty: true`) until Stage 7 is committed and `metrics` rerun. Nothing committed.
+

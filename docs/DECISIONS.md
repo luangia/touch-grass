@@ -178,6 +178,14 @@ Census blocks (~10k+ polygons in the city) are heavier → serve **Mapbox Vector
 
 A block is **underserved** if its network walking distance to the nearest park access point exceeds the 10-minute threshold (800 m). Neighborhood metrics report the **population** in underserved blocks and the **share** of residents underserved. A **priority** ranking combines underserved population count with population density. Demographic indicators (ACS) are shown *alongside* these metrics as context; the UI text explicitly states that co-occurrence does not establish cause.
 
+**Amendment (2026-11-23, Stage 7 Q3, "Approve as recommended"): the priority formula.** "Combines underserved population with density" was too vague: read as a sum of two rankings, density dominated (the prototype put dense, mostly-served neighborhoods first). Priority is now one number:
+
+```
+priority(A) = underserved residents of A  /  land area (km², Census ALAND20) of A's populated blocks
+```
+
+It reads as "underserved residents per km² of where people live". It's high where many people are packed beyond a 10-minute walk. It's ranked only for areas with at least `metrics.min_residents_for_ranking` residents (1,000 in Portland), like the share ranking, so a tiny area can't top the list on a handful of people.
+
 ---
 
 ## D-012 — Version control
@@ -421,3 +429,30 @@ TouchGrass is a public portfolio project, so clipping, reprojecting or overlayin
 - **`foot=*` overrides `access`:** a way with `foot` ∈ {yes, designated, permissive} is walkable despite an `access` closure (`WalkFilter.foot_overrides`, applied to the keys in `foot_overrides_keys` = [access]). It does not override `service=private`, `area=yes` or the others.
 - **Found by:** the route check. The 7.7 km "longest walk" started on an `access=no` airport service road (OSM way 484824281) that OSRM refused.
 - **Portland effect:** ways 123,690 → 123,245 (−586 `access=no` and −60 `foot=private`, +152 foot-legal `access=private`); main network 8,370 → 8,323 km, 98.40% → 98.47% of nodes, 490 → 476 pieces; access points 15,676 → 15,601. 35 blocks changed by more than 1 m (20 shorter, 15 longer). The longest-walk block went from 7,709 m to **806 m**: it now snaps to the Marine Drive Trail (584 m, the same start OSRM uses) and reaches Broughton Beach; OSRM agrees. City-wide shares are unchanged to 0.1 point (85.0% within 10 min).
+
+---
+
+## D-022 — Neighborhood metrics: areas, rankings, priority, park area, ACS allocation and reliability
+
+**Status:** Accepted (2026-11-23, Stage 7 Q1–Q8, "Approve as recommended")
+
+| # | Choice |
+|---|---|
+| Q1 | Report by **every configured area type**: Portland's 93 neighborhoods *and* 4 council districts. Comparing the two shows how much the boundaries drive the conclusion (MAUP). |
+| Q2 | "Worst served" is ranked **two ways**: by share within 10 minutes and by number of underserved residents. The share (and priority) rankings include only areas with ≥ `min_residents_for_ranking` residents (1,000); smaller areas are listed separately, not hidden. |
+| Q3 | Priority = underserved residents per km² of populated-block land (D-011 amendment). |
+| Q4 | Park area: **park area reachable within 10 minutes** (population-weighted, per block) is primary. Park area *inside the boundary* per resident is kept as a labelled secondary measure, because it rewards boundaries that happen to contain a big park. |
+| Q5 | ACS estimates are allocated to areas by **2020 block population**: f(A, g) = in-A population of g / population of *all* of g's blocks. The denominator comes from the raw TIGER block file, so a block group that straddles the city line contributes only its in-city share. |
+| Q6 | Area-level indicators: **total population, zero-vehicle households (B25044), people of color (1 − non-Hispanic white alone, B03002)**. Median household income stays at block-group level: a median can't be allocated or summed. |
+| Q7 | Reliability from the coefficient of variation CV = (MOE / 1.645) / estimate: **high** < 15%, **medium** ≤ 30%, **low** otherwise (or undefined). Low values are shown, marked, and never ranked. |
+| Q8 | A separate `touchgrass metrics <region>` command for the latest analysis run. Its outputs live in that run's folder (`runs/<run_id>/`), and its tables are keyed by `run_id`. |
+
+**Implementation notes:**
+- **City totals come from blocks**, never from summing areas: overlapping neighborhoods count a shared block in each.
+- **Unreachable blocks** (D-021 Q6) count as beyond every threshold.
+- **MOE propagation** follows the Census *ACS Handbook* (2020), ch. 8:
+  - A sum's MOE is √Σ MOE²; zero-estimate components contribute only their single largest MOE.
+  - An allocated part f·x has MOE f·MOE(x); f is treated as exact.
+  - A proportion uses √(MOE_X² − p²·MOE_Y²)/Y, falling back to the ratio formula when the radicand is negative.
+  - p and 1 − p share one MOE.
+

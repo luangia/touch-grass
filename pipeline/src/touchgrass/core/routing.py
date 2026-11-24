@@ -62,7 +62,15 @@ def build_routing_graph(edges: pd.DataFrame, access: pd.DataFrame) -> RoutingGra
         nodes.get_indexer(access["v"]),
     ]
     weights = np.r_[edges["length_m"], access["offset_u_m"], access["offset_v_m"]].astype(float)
-    # Undirected: store each link once as (low, high), keep the cheapest parallel, mirror.
+    r, c, w = _undirected(rows, cols, weights)
+    matrix = csr_matrix((w, (r, c)), shape=(n + k, n + k))
+    return RoutingGraph(matrix, nodes, access["access_id"].to_numpy(), access["park_id"].to_numpy())
+
+
+def _undirected(
+    rows: np.ndarray, cols: np.ndarray, weights: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Store each link once as (low, high), keep the cheapest parallel, then mirror."""
     lo, hi = np.minimum(rows, cols), np.maximum(rows, cols)
     reduced = (
         pd.DataFrame({"lo": lo, "hi": hi, "w": weights})
@@ -70,11 +78,11 @@ def build_routing_graph(edges: pd.DataFrame, access: pd.DataFrame) -> RoutingGra
         .min()
     )
     reduced = reduced[reduced["lo"] != reduced["hi"]]  # self-loops never shorten a path
-    r = np.r_[reduced["lo"], reduced["hi"]]
-    c = np.r_[reduced["hi"], reduced["lo"]]
-    w = np.r_[reduced["w"], reduced["w"]]
-    matrix = csr_matrix((w, (r, c)), shape=(n + k, n + k))
-    return RoutingGraph(matrix, nodes, access["access_id"].to_numpy(), access["park_id"].to_numpy())
+    return (
+        np.r_[reduced["lo"], reduced["hi"]],
+        np.r_[reduced["hi"], reduced["lo"]],
+        np.r_[reduced["w"], reduced["w"]],
+    )
 
 
 def nearest_access(graph: RoutingGraph) -> tuple[pd.Series, pd.Series]:
@@ -152,4 +160,59 @@ def block_distances(
             "route_kind": kind,
             "nearest_access_id": best_access,
         }
+    )
+
+
+def parks_within(
+    edges: pd.DataFrame, access: pd.DataFrame, origins: pd.DataFrame, limit_m: float
+) -> pd.DataFrame:
+    """Every (block, park) pair with a walk of at most ``limit_m`` (DECISIONS.md D-022 Q4).
+
+    One bounded multi-source search per park, from that park's access points only.
+    Other parks' access nodes must NOT be in the graph: a contact-stretch access node
+    joins its edge's two ends with offset_u + offset_v < edge length (the stretch is
+    skipped), so as a pass-through node it would be a shortcut. In the nearest-park
+    search that is harmless (every access node is a source at distance 0); here it is not.
+
+    Returns geoid20, park_id, network_m, sorted.
+    """
+    nodes = pd.Index(np.unique(np.r_[edges["u"].to_numpy(), edges["v"].to_numpy()]))
+    n = len(nodes)
+    base_r, base_c, base_w = _undirected(
+        nodes.get_indexer(edges["u"]),
+        nodes.get_indexer(edges["v"]),
+        edges["length_m"].to_numpy(dtype=float),
+    )
+    out = []
+    for park_id, acc in access.groupby("park_id", sort=True):
+        k = len(acc)
+        a = np.arange(n, n + k)
+        # Access links get the same reduction (a loop edge has u == v: one cell, not two).
+        # They never collide with base cells: access nodes are numbered from n.
+        ar, ac, aw = _undirected(
+            np.r_[a, a],
+            np.r_[nodes.get_indexer(acc["u"]), nodes.get_indexer(acc["v"])],
+            np.r_[acc["offset_u_m"], acc["offset_v_m"]].astype(float),
+        )
+        r, c, w = np.r_[base_r, ar], np.r_[base_c, ac], np.r_[base_w, aw]
+        matrix = csr_matrix((w, (r, c)), shape=(n + k, n + k))
+        dist = dijkstra(matrix, directed=False, indices=a, min_only=True, limit=limit_m)
+        node_dist = pd.Series(dist[:n], index=nodes)
+        node_park = pd.Series(np.where(np.isfinite(dist[:n]), park_id, None), index=nodes)
+        d = block_distances(origins, acc, node_dist, node_park)
+        hit = d["network_m"].to_numpy() <= limit_m
+        out.append(
+            pd.DataFrame(
+                {
+                    "geoid20": d["geoid20"].to_numpy()[hit],
+                    "park_id": park_id,
+                    "network_m": d["network_m"].to_numpy()[hit],
+                }
+            )
+        )
+    cols = ["geoid20", "park_id", "network_m"]
+    if not out:
+        return pd.DataFrame(columns=cols)
+    return pd.concat(out, ignore_index=True)[cols].sort_values(
+        ["geoid20", "park_id"], ignore_index=True
     )
