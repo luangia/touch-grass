@@ -295,3 +295,20 @@ You asked for four changes. Here is the reasoning on each, then what was built.
 
 **Tests:** web 25 → 31 (pan limit, block class lookup, block-first panel with park name and area link, unnamed park and no route, plain-words headline, blocks view hides the walk-time choice). API 35 (+ park name and ETag version assertions).
 
+## 18. Second review: About, overlay, palette, design, dark mode (2026-11-23)
+
+| Your point | Assessment | Built |
+|---|---|---|
+| An About page | Yes. It's also the right home for Stage 10's planned methodology page, so one page, not two | `/about`: framing, city figures (652,503 residents; 85% within 10 min; 97,753 farther), the four measurement steps with the real parameters, the caveats, data sources, and credits linking your name to luangia.github.io. All facts come from the API |
+| A more noticeable zoom-out warning | Yes, but not a blocking modal, which would stop scroll-to-zoom | The map dims, and a centered card ("Blocks appear when you zoom in") has a Zoom in button; the overlay ignores the pointer |
+| The yellow is too unnoticeable; maybe red/orange/green/blue | The real problem was worse than faintness: the **worst** class was the palest. Agreed on warm-for-bad, but no green (it's the parks' color and the red-green color-blind pair) | The residents view uses the block view's palette: red, orange, three blues. Both views now read "warm = worse access" |
+| Modern, minimal, scientific, white, some green but not overwhelming | Precision and visible sources make it feel scientific, more than decoration does. Green stays an accent | Inter; near-black text on white; hairlines; one forest-green accent; pill toggles; hero numbers; softer parks (the old dark green was what felt heavy) |
+| Dark mode (yours) | | System default + remembered toggle, the dark basemap, faded buildings, MapLibre controls themed |
+
+**Found while checking in the browser:**
+- On the dark basemap the **buildings sit above the area fills in near-black**, which made the residents view noisy. Fix: fade every basemap `building` fill layer in the residents view and restore it in the block view. This works for any OpenMapTiles-schema basemap, not just these two styles.
+- **Screen-reader spacing:** the hero number and its sentence are separate elements, and without a space between them the text read "62%of residents". The test caught it.
+- You were using the pane while I tested. My click on the theme toggle flipped your light choice to dark; I put light back.
+
+**Tests:** web 36 (+ routing, About page from API data and the credit link, theme toggle and memory, navigation, palette consistency). API unchanged (35).
+

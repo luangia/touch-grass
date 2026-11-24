@@ -30,7 +30,14 @@ import { api } from "../api/client";
 import type { AreaCollection, AreaProperties } from "../api/geojson";
 import type { Mode } from "../state/url";
 import { type Bounds, expandBounds, MAX_PAN_KM } from "./bounds";
-import { type BlockClass, blockColorExpression, PARK_COLOR, shareColorExpression } from "./style";
+import {
+  type BlockClass,
+  blockColorExpression,
+  LINE_STYLE,
+  PARK_STYLE,
+  shareColorExpression,
+  type Theme,
+} from "./style";
 
 export type { Bounds } from "./bounds";
 
@@ -47,6 +54,7 @@ export type BlockProperties = {
 };
 
 export type MapClick = { areas: AreaProperties[]; block: BlockProperties | null };
+export type Camera = { center: [number, number]; zoom: number };
 
 type Props = {
   region: RegionDetail;
@@ -56,7 +64,11 @@ type Props = {
   selectedArea: string | null;
   selectedBlock: string | null;
   focus: Bounds | null;
+  theme: Theme;
   basemapStyle: string;
+  /** Where to start (e.g. after a theme switch rebuilt the map); else the region's bbox. */
+  initialCamera: Camera | null;
+  onMoveEnd: (camera: Camera) => void;
   onHoverArea: (props: AreaProperties | null) => void;
   onClick: (hit: MapClick) => void;
   onError: (message: string) => void;
@@ -84,11 +96,32 @@ function firstLayerOf(map: MLMap, sourceLayer: string): string | undefined {
     ?.id;
 }
 
+/**
+ * The basemap's buildings sit above the area fills (they're drawn after water). In the
+ * residents view they're noise over the colors, nearly black on the dark basemap, so they fade.
+ * In the blocks view they help you find your street, so they come back.
+ */
+function setBuildingEmphasis(map: MLMap, mode: Mode): void {
+  for (const layer of map.getStyle().layers) {
+    if (layer.type !== "fill" || !("source-layer" in layer) || layer["source-layer"] !== "building")
+      continue;
+    map.setPaintProperty(layer.id, "fill-opacity", mode === "residents" ? 0.12 : 1);
+  }
+}
+
 /** Areas are opaque in the residents view; in the blocks view transparent but clickable. */
 const areaOpacity = (mode: Mode) => (mode === "residents" ? 1 : 0);
 const blockVisibility = (mode: Mode) => (mode === "blocks" ? "visible" : "none");
 
-function addDataLayers(map: MLMap, region: RegionDetail, classes: BlockClass[], mode: Mode): void {
+function addDataLayers(
+  map: MLMap,
+  region: RegionDetail,
+  classes: BlockClass[],
+  mode: Mode,
+  theme: Theme,
+): void {
+  const park = PARK_STYLE[theme];
+  const line = LINE_STYLE[theme];
   const firstSymbol = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
   // Areas go under the basemap's water, roads and labels (D-024 Q4); blocks and parks under
   // its roads; outlines over roads but under labels. Fallback: below the first label.
@@ -133,7 +166,16 @@ function addDataLayers(map: MLMap, region: RegionDetail, classes: BlockClass[], 
         id: "parks-fill",
         type: "fill",
         source: PARKS,
-        paint: { "fill-color": PARK_COLOR, "fill-opacity": 0.85 },
+        paint: { "fill-color": park.fill, "fill-opacity": park.opacity },
+      },
+      belowRoads,
+    ],
+    [
+      {
+        id: "parks-line",
+        type: "line",
+        source: PARKS,
+        paint: { "line-color": park.outline, "line-width": 0.8, "line-opacity": 0.8 },
       },
       belowRoads,
     ],
@@ -143,7 +185,7 @@ function addDataLayers(map: MLMap, region: RegionDetail, classes: BlockClass[], 
         type: "line",
         source: AREAS,
         filter: ["!=", ["get", "ranked"], false],
-        paint: { "line-color": "#424242", "line-width": 0.8 },
+        paint: { "line-color": line.area, "line-width": 0.8 },
       },
       firstSymbol,
     ],
@@ -153,7 +195,7 @@ function addDataLayers(map: MLMap, region: RegionDetail, classes: BlockClass[], 
         type: "line",
         source: AREAS,
         filter: ["==", ["get", "ranked"], false],
-        paint: { "line-color": "#424242", "line-width": 1.2, "line-dasharray": [2, 2] },
+        paint: { "line-color": line.area, "line-width": 1.2, "line-dasharray": [2, 2] },
       },
       firstSymbol,
     ],
@@ -163,7 +205,7 @@ function addDataLayers(map: MLMap, region: RegionDetail, classes: BlockClass[], 
         type: "line",
         source: AREAS,
         paint: {
-          "line-color": "#000000",
+          "line-color": line.highlight,
           "line-width": [
             "case",
             ["boolean", ["feature-state", "selected"], false],
@@ -185,7 +227,7 @@ function addDataLayers(map: MLMap, region: RegionDetail, classes: BlockClass[], 
         minzoom: BLOCK_MIN_ZOOM,
         layout: { visibility: blockVisibility(mode) },
         paint: {
-          "line-color": "#000000",
+          "line-color": line.highlight,
           "line-width": ["case", ["boolean", ["feature-state", "selected"], false], 3, 0],
         },
       },
@@ -215,14 +257,19 @@ export function MapView(props: Props) {
     if (!container.current) return;
     const { bbox } = props.region;
     const box: Bounds = [bbox.west, bbox.south, bbox.east, bbox.north];
+    const camera = props.initialCamera;
     const map = new maplibregl.Map({
       container: container.current,
       style: props.basemapStyle,
-      bounds: [
-        [bbox.west, bbox.south],
-        [bbox.east, bbox.north],
-      ],
-      fitBoundsOptions: { padding: 24 },
+      ...(camera
+        ? { center: camera.center, zoom: camera.zoom }
+        : {
+            bounds: [
+              [bbox.west, bbox.south],
+              [bbox.east, bbox.north],
+            ] as [[number, number], [number, number]],
+            fitBoundsOptions: { padding: 24 },
+          }),
       maxBounds: expandBounds(box, MAX_PAN_KM), // the region and its surroundings, not the world
     });
     mapRef.current = map;
@@ -231,11 +278,16 @@ export function MapView(props: Props) {
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
     map.on("load", () => {
-      addDataLayers(map, props.region, props.blockClasses, handlers.current.mode);
+      addDataLayers(map, props.region, props.blockClasses, handlers.current.mode, props.theme);
+      setBuildingEmphasis(map, handlers.current.mode);
       setLoaded(true);
     });
     setZoom(map.getZoom());
     map.on("zoomend", () => setZoom(map.getZoom()));
+    map.on("moveend", () => {
+      const c = map.getCenter();
+      handlers.current.onMoveEnd({ center: [c.lng, c.lat], zoom: map.getZoom() });
+    });
     map.on("error", (e) => {
       const msg = e.error?.message ?? "map error";
       handlers.current.onError(msg);
@@ -285,6 +337,7 @@ export function MapView(props: Props) {
     const map = mapRef.current;
     if (!loaded || !map) return;
     map.setPaintProperty("areas-fill", "fill-opacity", areaOpacity(props.mode));
+    setBuildingEmphasis(map, props.mode);
     for (const id of ["blocks-fill", "blocks-selected"])
       map.setLayoutProperty(id, "visibility", blockVisibility(props.mode));
     if (props.mode === "blocks" && map.getZoom() < BLOCK_MIN_ZOOM)
@@ -340,14 +393,38 @@ export function MapView(props: Props) {
     <div className="map-wrap">
       <div ref={container} className="map" data-testid="map" />
       {needZoom ? (
-        <div className="map-hint" role="status">
-          Zoom in to see each block's walk to a park.{" "}
-          <button
-            type="button"
-            onClick={() => mapRef.current?.easeTo({ zoom: BLOCK_MIN_ZOOM, duration: 600 })}
-          >
-            Zoom in
-          </button>
+        // Dims the map so "nothing drawn yet" is obvious, without blocking scroll-to-zoom: the
+        // overlay ignores the pointer, only the card takes clicks.
+        <div className="zoom-overlay">
+          <div className="zoom-card" role="status">
+            <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+              <circle
+                cx="10.5"
+                cy="10.5"
+                r="6.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              />
+              <path
+                d="M10.5 7.5v6M7.5 10.5h6M15.5 15.5 20 20"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+            <p className="zoom-title">Blocks appear when you zoom in</p>
+            <p className="zoom-text">
+              Each census block's walk to a park is drawn from street level.
+            </p>
+            <button
+              type="button"
+              className="button-primary"
+              onClick={() => mapRef.current?.easeTo({ zoom: BLOCK_MIN_ZOOM, duration: 600 })}
+            >
+              Zoom in
+            </button>
+          </div>
         </div>
       ) : null}
     </div>

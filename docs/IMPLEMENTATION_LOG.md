@@ -510,3 +510,23 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 
 **Pan limit measured:** 130.5–114.8°W, 40.0–51.0°N with 600 km. 400 km, tried first, cut off eastern Oregon.
 
+## 2026-11-23 — Stage 9 second review: About page, zoom overlay, palette, design, dark mode
+
+**Decisions:** D-024 amendment 2. Lesson §18 has the reasoning.
+
+**Built:**
+- `components/AboutPage.tsx`, `theme.ts`, and the routing helpers in `state/url.ts`.
+- The redesigned `styles.css` (light and dark tokens), Inter (`@fontsource-variable/inter` 5.3.0).
+- Themed MapView: basemap, parks, lines, camera kept on rebuild, faded buildings.
+- The zoom overlay and the shared RdYlBu palette.
+
+**Checked in the browser:**
+- dark and light residents views;
+- the theme switch keeping the camera;
+- the About page (live figures, 6 caveats, sources, credit link);
+- the block-view overlay at z10;
+- the narrow layout (the pane was narrow);
+- no console errors.
+
+**Tests:** web 36, build OK. Nothing committed.
+

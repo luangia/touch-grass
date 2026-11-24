@@ -108,6 +108,12 @@ describe("share classes", () => {
     expect(at(null)).toBe(rgba(NO_DATA_COLOR));
   });
 
+  it("shares the block view's palette: worst = the same warm, best = the same cool", () => {
+    const blocks = blockClasses(THRESHOLDS, 10);
+    expect(SHARE_COLORS[0]).toBe(blocks[blocks.length - 1]!.color); // under 50% = beyond 15 min
+    expect(SHARE_COLORS[SHARE_COLORS.length - 1]).toBe(blocks[0]!.color); // 95%+ = within 5 min
+  });
+
   it("panel class index agrees with the map", () => {
     expect([0, 0.5, 0.7, 0.849, 0.85, 0.95, 1].map(shareClassIndex)).toEqual([0, 1, 2, 2, 3, 4, 4]);
   });

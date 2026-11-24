@@ -512,3 +512,18 @@ TouchGrass is a public portfolio project, so clipping, reprojecting or overlayin
 - Block tiles gain `nearest_park_name`.
 - The ETag gains a response-format version (`RESPONSE_VERSION`, now 2). Without it, a browser keeps a pre-change tile for the same run: the 304 says "unchanged" because the run is unchanged. Found when the panel showed no park names right after the change. After a format change a cached copy can still be served until its `max-age` (5 min) expires.
 
+**Amendment 2 (2026-11-23, "build as recommended", credits with name + profile link, plus dark mode):**
+1. **About page** at `/about`; it doubles as Stage 10's planned methodology page. It has no router library (history API). Every figure, parameter, caveat and source comes from the API. The city figures come from `/areas/city/metrics`. Fixed text: the framing, and the credits ("Built by Luan Pham", linking to luangia.github.io).
+2. **Zoom-in notice:** the map dims and a centered card with a "Zoom in" button appears. The overlay ignores the pointer, so scroll-to-zoom still works.
+3. **Residents palette = the block palette** (RdYlBu without its pale middle): red/orange for low shares, blues for high. The worst class is now the most visible, not the palest. Green is excluded from data colors: it means parks and the brand, and red-green is the commonest color-blind confusion. A test pins that the two views share their extreme colors.
+4. **Design:**
+   - **Type:** Inter (self-hosted via `@fontsource-variable/inter`; no font CDN).
+   - **Color:** a white page, near-black text, hairline borders, and one forest-green accent (`#2f7d55` light / `#62b98a` dark) used only for the brand mark, active tab, links, focus rings and the primary button.
+   - **Components:** pill toggles, hero numbers in the panel.
+   - **Parks:** a soft green fill with a darker outline instead of a dark solid.
+   - **Basemap buildings** fade in the residents view (nearly black on the dark basemap) and return in the block view.
+5. **Dark mode:**
+   - **Default and memory:** the system setting by default; a header toggle remembers the choice in localStorage (a per-browser convenience; it falls back to the system setting if storage is blocked). `index.html` sets the theme before first paint.
+   - **Basemap:** OpenFreeMap `dark` (`VITE_BASEMAP_STYLE_DARK`).
+   - **Map rebuild:** the map is rebuilt on a theme switch, keeping your camera position.
+

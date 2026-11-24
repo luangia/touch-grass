@@ -6,7 +6,8 @@ import { AreaTypeToggle, SearchBox, ThresholdToggle } from "../src/components/Co
 import { SidePanel, type Selection } from "../src/components/SidePanel";
 import { displayName } from "../src/format";
 import { blockClasses } from "../src/map/style";
-import { formatView, parseView } from "../src/state/url";
+import { formatView, pageFromPath, parseView, pathFor } from "../src/state/url";
+import { AboutPage, AUTHOR } from "../src/components/AboutPage";
 import { AREAS, feature, METHODOLOGY, metrics, REGION, SUMMARY } from "./fixtures";
 
 // jsdom has no WebGL: the map itself is replaced; everything around it is real.
@@ -45,6 +46,48 @@ describe("url state", () => {
     expect(
       formatView({ mode: null, region: null, areaType: null, threshold: null, area: null }),
     ).toBe("");
+  });
+});
+
+describe("pages", () => {
+  it("maps paths to pages and back", () => {
+    expect(pageFromPath("/")).toBe("map");
+    expect(pageFromPath("/about")).toBe("about");
+    expect(pageFromPath("/about/")).toBe("about");
+    expect(pageFromPath("/elsewhere")).toBe("map");
+    expect([pathFor("map"), pathFor("about")]).toEqual(["/", "/about"]);
+  });
+});
+
+describe("AboutPage", () => {
+  it("builds every figure and source from the API and credits the author", () => {
+    const onOpenMap = vi.fn();
+    render(
+      <AboutPage
+        region={REGION}
+        methodology={METHODOLOGY}
+        city={metrics({ area_id: "city", area_type: "city", name: "Testville" })}
+        onOpenMap={onOpenMap}
+      />,
+    );
+    expect(screen.getByText(/how many residents of Testville can walk/)).toBeTruthy();
+    expect(screen.getByText("2,000")).toBeTruthy(); // residents, from the city metrics
+    expect(screen.getByText(/at 4.8 km\/h/)).toBeTruthy();
+    expect(screen.getByText(/within a 5, 10 and 15-minute walk/)).toBeTruthy();
+    expect(screen.getByText(/fewer than 1,000 residents are shown but not ranked/)).toBeTruthy();
+    expect(screen.getByText("Distances are walking routes.")).toBeTruthy();
+    expect(screen.getByText("Example Agency")).toBeTruthy();
+    const credit = screen.getByRole("link", { name: AUTHOR.name });
+    expect(credit.getAttribute("href")).toBe("https://luangia.github.io");
+    expect(credit.getAttribute("rel")).toContain("noopener");
+    fireEvent.click(screen.getByRole("button", { name: "Open the map" }));
+    expect(onOpenMap).toHaveBeenCalled();
+  });
+
+  it("reads fine before the city figures arrive", () => {
+    render(<AboutPage region={REGION} methodology={null} city={null} onOpenMap={vi.fn()} />);
+    expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
+    expect(screen.queryByText("Residents")).toBeNull();
   });
 });
 
@@ -243,7 +286,9 @@ describe("App", () => {
     });
     const { App } = await import("../src/App");
     render(<App />);
-    await waitFor(() => expect(screen.getByText("· Testville")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: /TouchGrass\s*Testville/ })).toBeTruthy(),
+    );
     expect((screen.getByLabelText("10 min") as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText("Neighborhoods (3)") as HTMLInputElement).checked).toBe(true);
     await waitFor(() => expect(screen.getByText("3 to choose from")).toBeTruthy());
@@ -266,6 +311,36 @@ describe("App", () => {
     fireEvent.click(screen.getByLabelText("Residents near a park"));
     await waitFor(() => expect(screen.getByLabelText("5 min")).toBeTruthy());
     expect(window.location.search).toBe("?view=residents");
+  });
+
+  it("navigates to About and toggles the theme, remembering the choice", async () => {
+    document.documentElement.dataset.theme = "light";
+    window.localStorage.removeItem("touchgrass-theme");
+    stubFetch({
+      "/api/v1/regions/testville-zz/areas/city/metrics": {
+        region_id: "testville-zz",
+        run_id: "abc123",
+        area: metrics({ area_id: "city", area_type: "city" }),
+      },
+      "/api/v1/regions/testville-zz/areas?type=neighborhood&threshold=10": AREAS,
+      "/api/v1/regions/testville-zz/methodology": METHODOLOGY,
+      "/api/v1/regions/testville-zz": REGION,
+      "/api/v1/regions": [SUMMARY],
+    });
+    const { App } = await import("../src/App");
+    render(<App />);
+    const about = await screen.findByRole("link", { name: "About" });
+    fireEvent.click(about);
+    await waitFor(() => expect(window.location.pathname).toBe("/about"));
+    expect(
+      screen.getByRole("heading", { level: 1, name: "How far is a park, really?" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("link", { name: "About" }).getAttribute("aria-current")).toBe("page");
+    fireEvent.click(screen.getByRole("button", { name: "Switch to dark theme" }));
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(window.localStorage.getItem("touchgrass-theme")).toBe("dark");
+    fireEvent.click(screen.getByRole("button", { name: "Open the map" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/"));
   });
 
   it("says clearly when the API is down", async () => {

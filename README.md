@@ -30,7 +30,7 @@ uv run pytest                           # seeds a throwaway touchgrass_apitest d
 
 cd ../web                               # the map (needs the API running)
 npm ci                                  # exact versions from package-lock.json
-npm run dev                             # http://localhost:5173
+npm run dev                             # http://localhost:5173 (map) and /about
 npm test                                # tsc + Vitest
 ```
 

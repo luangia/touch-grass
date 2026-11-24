@@ -2,7 +2,7 @@
 
 import type { AreaMetrics, Methodology, RegionDetail } from "../api/client";
 import type { AreaProperties } from "../api/geojson";
-import { displayName, int, meters, minutes, pct } from "../format";
+import { displayName, int, meters, minutes, pct, typeLabel } from "../format";
 import type { BlockProperties } from "../map/MapView";
 import { type BlockClass, blockClassOf, SHARE_COLORS, shareClassIndex } from "../map/style";
 import type { Mode } from "../state/url";
@@ -50,11 +50,16 @@ function AreaSection(props: Props & { area: AreaMetrics }) {
   const current = area.thresholds.find((t) => t.threshold_min === threshold);
   return (
     <section aria-label="Selected area">
+      <p className="overline">
+        {area.area_type === "city" ? "Whole city" : typeLabel(area.area_type)}
+      </p>
       <h2>{displayName(area.name, area.area_type)}</h2>
       {current ? (
-        <p className="headline">
-          <strong>{pct(current.pct_within)}</strong> of residents live within a {threshold}-minute
-          walk of {PARKS}.
+        <p className="hero">
+          <span className="hero-number">{pct(current.pct_within)}</span>{" "}
+          <span className="hero-text">
+            of residents live within a {threshold}-minute walk of {PARKS}.
+          </span>
         </p>
       ) : null}
       <p className="muted">{int(area.pop_total)} residents (2020 Census)</p>
@@ -122,6 +127,7 @@ function BlockSection(props: Props & { block: BlockProperties }) {
   const parkCount = block.parks_reachable ?? 0;
   return (
     <section aria-label="Selected census block" className="block-section">
+      <p className="overline">Selected block</p>
       <h2>Census block</h2>
       {props.selection.alsoIn.length > 0 ? (
         <p className="muted">
@@ -136,18 +142,23 @@ function BlockSection(props: Props & { block: BlockProperties }) {
       ) : null}
       {distance !== null ? (
         <>
-          <p className="headline">
-            <span
-              className="swatch"
-              style={{ background: cls?.color ?? "transparent" }}
-              aria-hidden="true"
-            />
-            <strong>{meters(distance)}</strong> to{" "}
-            {block.nearest_park_name ? (
-              <strong>{block.nearest_park_name}</strong>
-            ) : (
-              "the nearest park"
-            )}
+          <p className="hero">
+            <span className="hero-number">
+              <span
+                className="swatch"
+                style={{ background: cls?.color ?? "transparent" }}
+                aria-hidden="true"
+              />
+              {meters(distance)}
+            </span>{" "}
+            <span className="hero-text">
+              to{" "}
+              {block.nearest_park_name ? (
+                <strong>{block.nearest_park_name}</strong>
+              ) : (
+                "the nearest park"
+              )}
+            </span>
           </p>
           <p>
             About a {minutes(distance, metersPerMinute(region))} walk,{" "}
@@ -160,7 +171,7 @@ function BlockSection(props: Props & { block: BlockProperties }) {
           </p>
         </>
       ) : (
-        <p className="headline">No walking route to a park on the mapped paths.</p>
+        <p className="hero-text">No walking route to a park on the mapped paths.</p>
       )}
       <p className="muted">
         {int(block.pop20)} residents ·{" "}

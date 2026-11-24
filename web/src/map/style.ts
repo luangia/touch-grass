@@ -7,7 +7,9 @@
  * Neighborhoods: share of residents within the chosen threshold, FIXED breaks, so a color
  * means the same share at every threshold and in every region.
  *
- * Colors are ColorBrewer RdYlBu (blocks) and YlGnBu (shares), both rated colorblind-safe.
+ * Both views share one palette, ColorBrewer RdYlBu (rated colorblind-safe): warm = worse access,
+ * cool = better. Green is left out on purpose: it means parks (and the brand accent), and red vs
+ * green is the pair colorblind readers most often confuse (D-024 amendment 2).
  */
 
 import type { ExpressionSpecification } from "maplibre-gl";
@@ -20,11 +22,27 @@ const COOL = ["#2c7bb6", "#74add1", "#abd9e9"];
 const WARM = ["#fdae61", "#f46d43", "#d7191c"];
 export const NO_ROUTE_COLOR = "#9e9e9e";
 export const NO_DATA_COLOR = "#e0e0e0";
-/** Parks: a dark green no share or distance class uses. */
-export const PARK_COLOR = "#1b7837";
 
-/** ColorBrewer YlGnBu, 5 classes: low share = light, high share = dark. */
-export const SHARE_COLORS = ["#ffffcc", "#a1dab4", "#41b6c4", "#2c7fb8", "#253494"];
+export type Theme = "light" | "dark";
+
+/** Parks: a soft green fill with a darker edge, so they read as parks without dominating. */
+export const PARK_STYLE: Record<Theme, { fill: string; opacity: number; outline: string }> = {
+  light: { fill: "#8fcf9c", opacity: 0.75, outline: "#2f7d55" },
+  dark: { fill: "#3f8f5f", opacity: 0.7, outline: "#7cc596" },
+};
+export const PARK_COLOR = PARK_STYLE.light.fill; // legend swatch
+
+/** Area outlines and selection, readable on either basemap. */
+export const LINE_STYLE: Record<Theme, { area: string; highlight: string }> = {
+  light: { area: "#4a524c", highlight: "#111511" },
+  dark: { area: "#b8c2bb", highlight: "#ffffff" },
+};
+
+/**
+ * RdYlBu without its pale middle, 5 classes: the lowest shares get the strongest warm color, so
+ * the areas that need attention are the most visible (the old YlGnBu made them the palest).
+ */
+export const SHARE_COLORS = ["#d7191c", "#fdae61", "#abd9e9", "#74add1", "#2c7bb6"];
 export const SHARE_BREAKS = [0.5, 0.7, 0.85, 0.95];
 
 function spread(palette: string[], n: number): string[] {

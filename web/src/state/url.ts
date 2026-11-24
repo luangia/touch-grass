@@ -44,3 +44,14 @@ export function formatView(view: ViewState): string {
   const s = q.toString();
   return s ? `?${s}` : "";
 }
+
+/** Two pages: the map at the root and About at /about (no router library needed). */
+export type Page = "map" | "about";
+
+export function pageFromPath(pathname: string): Page {
+  return /\/about\/?$/.test(pathname) ? "about" : "map";
+}
+
+export function pathFor(page: Page): string {
+  return page === "about" ? "/about" : "/";
+}

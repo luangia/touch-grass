@@ -9,21 +9,34 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   ApiError,
+  type AreaMetrics,
   type Methodology,
   type RegionDetail,
   type RegionSummary,
 } from "./api/client";
 import { type AreaCollection, type AreaProperties, bboxOf } from "./api/geojson";
+import { AboutPage } from "./components/AboutPage";
 import { AreaTypeToggle, ModeToggle, SearchBox, ThresholdToggle } from "./components/Controls";
 import { Legend } from "./components/Legend";
 import { type Selection, SidePanel } from "./components/SidePanel";
 import { typeLabel } from "./format";
-import { type Bounds, type MapClick, MapView } from "./map/MapView";
-import { blockClasses, blockLegend, PARK_COLOR, shareLegend } from "./map/style";
-import { formatView, type Mode, parseView, type ViewState } from "./state/url";
+import { type Bounds, type Camera, type MapClick, MapView } from "./map/MapView";
+import { blockClasses, blockLegend, PARK_COLOR, shareLegend, type Theme } from "./map/style";
+import {
+  formatView,
+  type Mode,
+  type Page,
+  pageFromPath,
+  parseView,
+  pathFor,
+  type ViewState,
+} from "./state/url";
+import { applyTheme, initialTheme } from "./theme";
 
-const BASEMAP: string =
-  import.meta.env.VITE_BASEMAP_STYLE ?? "https://tiles.openfreemap.org/styles/positron";
+const BASEMAP: Record<Theme, string> = {
+  light: import.meta.env.VITE_BASEMAP_STYLE ?? "https://tiles.openfreemap.org/styles/positron",
+  dark: import.meta.env.VITE_BASEMAP_STYLE_DARK ?? "https://tiles.openfreemap.org/styles/dark",
+};
 
 const WIDE = typeof window !== "undefined" && window.matchMedia?.("(min-width: 761px)").matches;
 
@@ -49,6 +62,11 @@ function defaultAreaType(region: RegionDetail): string | null {
 
 export function App() {
   const [view, setView] = useState<ViewState>(() => parseView(window.location.search));
+  const [page, setPage] = useState<Page>(() => pageFromPath(window.location.pathname));
+  const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [city, setCity] = useState<AreaMetrics | null>(null);
+  // The camera survives the map being rebuilt (theme switch, a visit to About).
+  const camera = useRef<Camera | null>(null);
   const [regions, setRegions] = useState<RegionSummary[] | null>(null);
   const [region, setRegion] = useState<RegionDetail | null>(null);
   const [methodology, setMethodology] = useState<Methodology | null>(null);
@@ -67,13 +85,31 @@ export function App() {
     setView((v) => ({ ...v, ...patch }));
   }, []);
   useEffect(() => {
-    const url = `${window.location.pathname}${formatView(view)}`;
+    const url = `${pathFor(page)}${formatView(view)}`;
     if (url === `${window.location.pathname}${window.location.search}`) return; // e.g. popstate
     if (pushNext.current) window.history.pushState(null, "", url);
     else window.history.replaceState(null, "", url);
-  }, [view]);
+  }, [view, page]);
+  const navigate = useCallback((p: Page) => {
+    pushNext.current = true;
+    setPage(p);
+    window.scrollTo(0, 0);
+  }, []);
   useEffect(() => {
-    const onPop = () => setView(parseView(window.location.search));
+    applyTheme(theme, false);
+  }, [theme]);
+  const toggleTheme = useCallback(() => {
+    setTheme((t) => {
+      const next = t === "dark" ? "light" : "dark";
+      applyTheme(next, true);
+      return next;
+    });
+  }, []);
+  useEffect(() => {
+    const onPop = () => {
+      setPage(pageFromPath(window.location.pathname));
+      setView(parseView(window.location.search));
+    };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
@@ -126,6 +162,17 @@ export function App() {
       .catch((e: unknown) => ctl.signal.aborted || setMapError(message(e)));
     return () => ctl.abort();
   }, [region, areaType, threshold]);
+
+  // City-wide figures for the About page.
+  useEffect(() => {
+    if (!region || page !== "about" || city) return;
+    const ctl = new AbortController();
+    api
+      .metrics(region.region_id, "city", ctl.signal)
+      .then((m) => setCity(m.area))
+      .catch(() => undefined); // the page reads fine without the figures
+    return () => ctl.abort();
+  }, [region, page, city]);
 
   // Selected area → metrics.
   useEffect(() => {
@@ -206,36 +253,107 @@ export function App() {
     return <main className="loading">Loading…</main>;
   }
 
+  const header = (
+    <header className="topbar">
+      <a
+        className="brand"
+        href={pathFor("map")}
+        onClick={(e) => {
+          e.preventDefault();
+          navigate("map");
+        }}
+      >
+        <span className="brand-mark" aria-hidden="true" />
+        TouchGrass
+        <span className="brand-region">{region.name}</span>
+      </a>
+      <nav aria-label="Pages">
+        {(["map", "about"] as const).map((p) => (
+          <a
+            key={p}
+            href={pathFor(p)}
+            aria-current={page === p ? "page" : undefined}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate(p);
+            }}
+          >
+            {p === "map" ? "Map" : "About"}
+          </a>
+        ))}
+      </nav>
+      <button
+        type="button"
+        className="theme-toggle"
+        onClick={toggleTheme}
+        aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+        title={theme === "dark" ? "Light theme" : "Dark theme"}
+      >
+        {theme === "dark" ? (
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            <path
+              d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path
+              d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </button>
+    </header>
+  );
+
+  if (page === "about") {
+    return (
+      <div className="app app-about">
+        {header}
+        <AboutPage
+          region={region}
+          methodology={methodology}
+          city={city}
+          onOpenMap={() => navigate("map")}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="app">
-      <header>
-        <h1>
-          TouchGrass <span className="muted">· {region.name}</span>
-        </h1>
-        <div className="controls">
-          <SearchBox
-            features={areas?.features ?? []}
-            areaType={areaType}
-            onSelect={(id) => selectArea(id, true)}
+      {header}
+      <div className="toolbar">
+        <SearchBox
+          features={areas?.features ?? []}
+          areaType={areaType}
+          onSelect={(id) => selectArea(id, true)}
+        />
+        <ModeToggle value={mode} onChange={changeMode} />
+        {/* Block colors already show every threshold, so the walk-time choice is for areas. */}
+        {mode === "residents" ? (
+          <ThresholdToggle
+            thresholds={region.thresholds}
+            value={threshold}
+            onChange={(t) => update({ threshold: t }, false)}
           />
-          <ModeToggle value={mode} onChange={changeMode} />
-          {/* Block colors already show every threshold, so the walk-time choice is for areas. */}
-          {mode === "residents" ? (
-            <ThresholdToggle
-              thresholds={region.thresholds}
-              value={threshold}
-              onChange={(t) => update({ threshold: t }, false)}
-            />
-          ) : null}
-          <AreaTypeToggle
-            types={region.area_types}
-            value={areaType}
-            onChange={(t) => update({ areaType: t, area: null })}
-          />
-        </div>
-      </header>
+        ) : null}
+        <AreaTypeToggle
+          types={region.area_types}
+          value={areaType}
+          onChange={(t) => update({ areaType: t, area: null })}
+        />
+      </div>
       <MapView
-        key={region.region_id}
+        key={`${region.region_id}-${theme}`}
         region={region}
         mode={mode}
         areas={areas}
@@ -243,7 +361,12 @@ export function App() {
         selectedArea={view.area}
         selectedBlock={selection.block?.geoid20 ?? null}
         focus={focus}
-        basemapStyle={BASEMAP}
+        theme={theme}
+        basemapStyle={BASEMAP[theme]}
+        initialCamera={camera.current}
+        onMoveEnd={(c) => {
+          camera.current = c;
+        }}
         onHoverArea={setHovered}
         onClick={onMapClick}
         onError={setMapError}
