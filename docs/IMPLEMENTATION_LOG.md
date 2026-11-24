@@ -380,3 +380,18 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 - **Your route check:** 289 / 913 / 921 m and 7.0 km. I queried OSRM foot for geometry, sending only the public coordinates (5 requests, one of them with placeholder coordinates sent before I'd read the real destination; its result was ignored). Three samples match our street portion to within 1 m. The fourth started on an `access=no` service road.
 - **Fix:** `WalkFilter` defaults add `access=no` and `foot=private`; `foot_overrides` lets `foot=yes|designated|permissive` beat an `access` closure. Tests +6 cases. 204 total, all passing.
 - **Reran** network → analyze (run `8205a92013b15324`) → load; effects in D-020 amendment 3. Nothing committed.
+
+## 2026-11-23 — Stage 6 committed and complete; Stage 7 prepared (no project code)
+
+**Stage 6:** committed as `d3fd91d`; `analyze` rerun on the clean commit gives run `7c1fc6efaf00effa` (rows identical to the previous run apart from run_id); reloaded. Verified: 204 tests; all hard checks pass; network and run fresh; tree clean.
+
+**Stage 7 prototype** (scratch, read-only):
+- Citywide 85.0% within 10 min, 97,753 underserved.
+- Lowest shares are small areas (Sunderland 0%, 698 people); the most underserved people are in East Portland (Powellhurst-Gilbert 11,867).
+- Weighting effects up to 45 points (blocks) and 67 points (land).
+- Inside-boundary park area is misleading (Alameda 0 m² per resident).
+- A rank-sum priority is dominated by density.
+- ACS allocation must divide by whole-block-group population (168 of 533 block groups below 90% in-city).
+- My prototype's proportion-MOE formula was simplified, so the reliability count (~28 of 93 with CV > 40%) is rough.
+
+**Created:** `docs/learning/stage-07-neighborhood-metrics.md` (Q1–Q8 pending).

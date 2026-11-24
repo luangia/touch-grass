@@ -6,16 +6,16 @@ _Last updated: 2026-11-23_
 
 | Item | Status |
 |---|---|
-| Phase | **Stages 1–5 complete. Stage 6 implemented, awaiting your review** |
-| Completed stages | 1 Foundations · 2 Boundaries & population · 3 Parks · 4 PostGIS · 5 Walk network & access points (2026-11-23) |
-| Current stage | 6: Walking accessibility. [Lesson](learning/stage-06-walking-accessibility.md) §13 (built), §14 (results + route check) |
-| Code | `pipeline/`: … + `touchgrass analyze` (SciPy multi-source Dijkstra, run records); 204 tests |
-| Database | schema at migration 0007; portland-or loaded (2 analysis runs: the latest plus one historical) |
-| Git | `main`, 3 commits ahead of `origin`. **Stage 6 prep and implementation uncommitted** |
+| Phase | **Stages 1–6 complete. Stage 7 prepared**, awaiting implementation approval |
+| Completed stages | 1 Foundations · 2 Boundaries & population · 3 Parks · 4 PostGIS · 5 Walk network · 6 Walking accessibility (2026-11-23) |
+| Next stage | 7: Neighborhood metrics. [Lesson](learning/stage-07-neighborhood-metrics.md). **Not approved for implementation**; decisions Q1–Q8 pending |
+| Code | `pipeline/`: … + `touchgrass analyze`; 204 tests |
+| Database | schema at migration 0007; portland-or loaded (3 analysis runs; latest `7c1fc6efaf00effa` on clean commit `d3fd91d`) |
+| Git | `main`, 5 commits ahead of `origin`. Stage 7 prep docs uncommitted |
 
 ## Currently being worked on
 
-- Stage 6 review. Your route check is done (lesson §16): 3 routes match OSRM exactly, and the 4th exposed an `access=no` gap, now fixed (D-020 amendment 3).
+- Stage 7 preparation done. Waiting on decisions Q1–Q8 and implementation approval.
 - ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
@@ -36,9 +36,8 @@ uv run pytest                            # -m data / -m db to select; db tests u
 
 ## Next steps
 
-1. Review Stage 6 (`/learn:stage-review 6` or `/learn:review`).
-2. Commit, then rerun `touchgrass analyze` for a run tied to the clean commit.
-3. Then `/learn:advance` to prepare Stage 7 (neighborhood metrics).
+1. Answer Stage 7 decisions Q1–Q8 (lesson §9).
+2. Approve implementation: `/learn:implement-stage 7`.
 
 ## Blockers / risks being watched
 
@@ -57,7 +56,7 @@ uv run pytest                            # -m data / -m db to select; db tests u
 
 Target bullets (pending implementation):
 - ☐ Built a reproducible geospatial ETL pipeline ingesting US Census (2020 blocks, ACS 5-year), TIGER/Line, and OpenStreetMap data with provenance tracking and automated validation. _(Stages 2–3)_
-- ☐ Computed pedestrian-network walking distance from 10,372 census blocks to the nearest of 15,676 park access points with a multi-source Dijkstra (24 ms), showing 85% of residents within a 10-minute walk vs 97% by straight line (median detour ratio 1.35). _(Stages 5–6; finalize after review)_
+- ☑ Computed pedestrian-network walking distance from 10,372 census blocks to the nearest of 15,601 park access points with a multi-source Dijkstra (24 ms), showing 85% of residents within a 10-minute walk vs 97% by straight line (median detour ratio 1.35); verified against OSRM. _(Stages 5–6)_
 - ☑ Designed a multi-region PostGIS schema with GiST-indexed spatial joins, measuring a ~60× speedup via `EXPLAIN ANALYZE`. _(Stage 4)_
 - ☐ Produced population-weighted 5/10/15-minute park-access metrics for ~95 Portland neighborhoods, identifying X residents beyond a 10-minute walk. _(Stage 7)_
 - ☐ Delivered a typed FastAPI service (GeoJSON + PostGIS-generated vector tiles) and a React/MapLibre interactive map for neighborhood comparison. _(Stages 8–10)_
