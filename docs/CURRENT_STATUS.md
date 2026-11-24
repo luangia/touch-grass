@@ -6,16 +6,16 @@ _Last updated: 2026-11-23_
 
 | Item | Status |
 |---|---|
-| Phase | **Stages 1–8 complete. Stage 9 implemented (2026-11-23)**, awaiting your review |
-| Completed stages | 1 Foundations · 2 Boundaries & population · 3 Parks · 4 PostGIS · 5 Walk network · 6 Walking accessibility · 7 Neighborhood metrics · 8 API (2026-11-23) |
-| Current stage | 9: Interactive map. [Lesson](learning/stage-09-interactive-map.md) §13–16; decisions D-024. Review items in §14 |
-| Code | `pipeline/`: … + `touchgrass analyze`, `touchgrass metrics`; 242 tests. `api/`: FastAPI, 10 endpoints; 35 tests. `web/`: React + MapLibre map; 25 tests |
+| Phase | **Stages 1–9 complete. Stage 10 being prepared**, not approved for implementation |
+| Completed stages | 1 Foundations · 2 Boundaries & population · 3 Parks · 4 PostGIS · 5 Walk network · 6 Walking accessibility · 7 Neighborhood metrics · 8 API · 9 Interactive map (2026-11-23) |
+| Next stage | 10: Comparison, underserved view, methodology and polish. [Lesson](learning/stage-10-comparison-and-polish.md). **Not approved for implementation**; decisions pending |
+| Code | `pipeline/`: … + `touchgrass analyze`, `touchgrass metrics`; 242 tests. `api/`: FastAPI, 10 endpoints; 35 tests. `web/`: React + MapLibre map, About page, light/dark; 36 tests |
 | Database | schema at migration 0008; portland-or loaded (3 analysis runs; latest `7c1fc6efaf00effa`, metrics on clean commit `0747c94`) |
-| Git | `main` pushed through Stage 8; 1 commit ahead (Stage 9 planning). Stage 9 implementation uncommitted |
+| Git | `main` 4 commits ahead of `origin` (Stage 9 planning, map, review changes, redesign). Stage 10 prep docs uncommitted |
 
 ## Currently being worked on
 
-- Stage 9 implemented: the map runs (`.claude/launch.json` → `api` + `web`). Waiting on your review (lesson §14).
+- Stage 10 preparation. Waiting on decisions and implementation approval.
 - ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
@@ -38,8 +38,8 @@ uv run pytest                            # -m data / -m db to select; db tests u
 
 ## Next steps
 
-1. Review Stage 9: use the map at http://localhost:5173 (lesson §14).
-2. On approval: commit, then `/learn:advance` to Stage 10 (comparison, underserved view, methodology).
+1. Answer the Stage 10 decisions (lesson §9).
+2. Approve implementation: `/learn:implement-stage 10`.
 
 ## Blockers / risks being watched
 
@@ -57,7 +57,7 @@ uv run pytest                            # -m data / -m db to select; db tests u
 **TouchGrass — Walkable Park Access Analysis Platform** · Python, FastAPI, PostgreSQL/PostGIS, GeoPandas, OSMnx, NetworkX, React, TypeScript, MapLibre GL JS
 
 Target bullets (pending implementation):
-- ☐ Built a reproducible geospatial ETL pipeline ingesting US Census (2020 blocks, ACS 5-year), TIGER/Line, and OpenStreetMap data with provenance tracking and automated validation. _(Stages 2–3)_
+- ☑ Built a reproducible geospatial ETL pipeline ingesting US Census (2020 blocks, ACS 5-year), TIGER/Line, and OpenStreetMap data with provenance tracking and automated validation. _(Stages 2–3)_
 - ☑ Computed pedestrian-network walking distance from 10,372 census blocks to the nearest of 15,601 park access points with a multi-source Dijkstra (24 ms), showing 85% of residents within a 10-minute walk vs 97% by straight line (median detour ratio 1.35); verified against OSRM. _(Stages 5–6)_
 - ☑ Designed a multi-region PostGIS schema with GiST-indexed spatial joins, measuring a ~60× speedup via `EXPLAIN ANALYZE`. _(Stage 4)_
 - ☑ Produced population-weighted 5/10/15-minute park-access metrics for 93 neighborhoods and 4 council districts, identifying 97,753 residents beyond a 10-minute walk, with ACS context carrying propagated margins of error and reliability labels. _(Stage 7)_

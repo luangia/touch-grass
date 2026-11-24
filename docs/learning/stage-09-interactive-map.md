@@ -1,6 +1,6 @@
 # Stage 9: Interactive Map Frontend
 
-> Status: **implemented 2026-11-23, awaiting your review.** §13 is what was built, §14 the browser check, §15 the answers to §12, and §16 where the build departed from the plan.
+> Status: **complete (2026-11-23, commits `2635677`, `8442cc7`, `6000586`).** §13 is what was built, §14 the browser check, §15 the answers to §12, and §16 where the build departed from the plan.
 > Findings marked **(prototype 2026-11-23)** come from a throwaway single-file page in the scratch area (MapLibre 6.17 from a CDN, the OpenFreeMap basemap, the running Stage 8 API), viewed in the in-app browser. No project code was changed. The temporary launch entry used to serve it was reverted.
 
 ## 1. Objective and expected outcome

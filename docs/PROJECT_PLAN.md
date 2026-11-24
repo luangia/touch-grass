@@ -1,6 +1,6 @@
 # Project Plan — TouchGrass
 
-> Status: **Stages 1–8 complete. Stage 9 implemented (2026-11-23), awaiting your review.** Stages 10–11 not started.
+> Status: **Stages 1–9 complete. Stage 10 being prepared** (not approved for implementation). Stage 11 not started.
 > See [ARCHITECTURE.md](ARCHITECTURE.md) for design and [DECISIONS.md](DECISIONS.md) for the trade-offs behind it.
 
 ## 1. Problem
@@ -250,7 +250,7 @@ Each stage: objective, functional requirements, concepts, dependencies, tasks, d
 
 ### Stage 9 — Interactive map frontend
 
-> **Implemented 2026-11-23, awaiting review.** [Lesson](learning/stage-09-interactive-map.md) (§13 built, §14 browser check and review items); decisions in D-024. `web/`, 25 tests.
+> **Complete 2026-11-23.** [Lesson](learning/stage-09-interactive-map.md) (§13 built, §14 browser check, §17–18 your two reviews); decisions in D-024 and its two amendments. `web/`, 36 tests.
 
 **Objective.** A MapLibre map that explores parks, neighborhoods, and walking access.
 
@@ -269,6 +269,8 @@ Each stage: objective, functional requirements, concepts, dependencies, tasks, d
 ---
 
 ### Stage 10 — Comparison, underserved view, methodology & polish
+
+> **Being prepared.** [Lesson](learning/stage-10-comparison-and-polish.md); decisions Q1–Q8 pending. Two README questions aren't answerable in the UI yet (straight line vs network; demographics), and no licences are stored, so the methodology criterion needs data, not just a page.
 
 **Objective.** Answer the project's questions clearly in the UI.
 

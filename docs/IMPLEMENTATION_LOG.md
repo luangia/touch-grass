@@ -530,3 +530,18 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 
 **Tests:** web 36, build OK. Nothing committed.
 
+## 2026-11-23 — Stage 9 committed and complete; Stage 10 prepared (no project code)
+
+**Stage 9:**
+- Committed as `2635677` (yours), `8442cc7` and `6000586`.
+- Verified: web 36, api 35 and pipeline 242 tests pass; Prettier clean; build OK; tree clean.
+- The Stage 2–3 resume bullet is now ticked: it was true and had been left unticked.
+
+**Stage 10 prototype** (read-only SQL, scratch):
+- **Walking route vs straight line:** 85.0% vs 97.2% within 10 min city-wide. Per neighborhood the median gap is 7.4 points; the largest is Sylvan-Highlands at 65; 20 of 87 neighborhoods show none.
+- **Neighborhood correlations:** zero-vehicle +0.27, people of color −0.14.
+- **Resident-based comparison:** people of color are 37.7% of residents beyond 10 min vs 32.9% within; zero-vehicle households 9.7% vs 12.4%. No MOE yet.
+- **No licences are stored** for any source.
+
+**Created:** `docs/learning/stage-10-comparison-and-polish.md` (Q1–Q8 pending).
+
