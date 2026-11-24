@@ -436,3 +436,19 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 
 **Created:** `docs/learning/stage-08-fastapi-backend.md` (Q1–Q9 pending).
 
+## 2026-11-23 — Stage 8 implemented (approved "Approve as recommended", Q1–Q9)
+
+**Decisions:** D-023.
+
+**Built:** lesson §13.
+- The `api/` uv project (package `touchgrass_api`): settings, a read-only pool, a schema-version check, dependencies, models, 3 routers + `/health`; 10 endpoints in all.
+- Pipeline: `metrics.caveats()` is the single source of the caveat text (record + report); `metrics` rerun and the region reloaded.
+- `.claude/launch.json` for the dev server.
+- Tests: 35 in `api/` (one runs on real data), plus 1 pipeline assertion. Ruff and mypy are clean in both projects; pipeline 242 passed.
+
+**Performance finding:** the tile query's outer `IS NOT NULL` filter was pushed into the inlined CTE, so `ST_AsMVTGeom` ran twice per block. `AS MATERIALIZED` took z12 p95 from 108 to 69 ms. Decoded tiles are identical. Parallelism and the attribute count were ruled out first.
+
+**Results (lesson §14):** areas p95 197 ms (target 500); rankings and metrics < 10 ms; parks 90 ms.
+
+**Not verified:** a browser client against the API (Stage 9). Nothing committed. The metrics record shows uncommitted code until Stage 8 is committed and `metrics` rerun.
+

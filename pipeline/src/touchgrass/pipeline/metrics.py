@@ -255,6 +255,7 @@ def run_metrics(
             .sort_index()
             .to_dict(),
             "ranked_areas": int(metrics["ranked"].sum()),
+            "caveats": caveats(cfg),
         },
     }
     report = build_report(cfg, metrics, shares, context, weights, run_id, record)
@@ -472,6 +473,63 @@ def _context_cell(ctx: pd.DataFrame, area_id: str, indicator: str) -> str:
     return f"*{text} (low)*" if r["reliability"] == acs_alloc.LOW else text
 
 
+def caveats(cfg: RegionConfig) -> list[dict[str, str]]:
+    """Plain-language limitations for the map (D-023 Q9): one source for report and API."""
+    not_parks = ""
+    if cfg.parks is not None and cfg.parks.subtract_reasons:
+        values = [
+            v.replace("_", " ")
+            for r in cfg.parks.subtract_reasons
+            for vs in cfg.parks.exclude_tags.get(r, {}).values()
+            for v in vs
+        ]
+        if values:
+            listed = ", ".join(values[:-1]) + (" or " if len(values) > 1 else "") + values[-1]
+            not_parks = f" and areas tagged {listed}"
+    return [
+        {
+            "id": "walk_network",
+            "title": "Distances are walking routes on OpenStreetMap paths.",
+            "text": f"They assume {cfg.analysis.walk_speed_kmh} km/h, from each census block's "
+            "interior point to the nearest point where a path meets a park. Missing or wrong "
+            "paths in OpenStreetMap change the result; steep hills, busy crossings and "
+            "sidewalk quality are not modelled.",
+        },
+        {
+            "id": "block_points",
+            "title": "Each block is one point.",
+            "text": "Everyone in a block is treated as living at the same spot, so large "
+            "blocks are less precise.",
+        },
+        {
+            "id": "park_definition",
+            "title": "What counts as a park",
+            "text": "comes from OpenStreetMap tags and the project's rules (decision log "
+            "D-018): public parks and natural areas count; areas closed to the public"
+            f"{not_parks} do not.",
+        },
+        {
+            "id": "context_not_cause",
+            "title": "Demographics are context, not cause.",
+            "text": "Showing car-free households or people of color next to park access does "
+            "not mean one causes the other. Patterns across areas say nothing about any "
+            "individual household (the ecological fallacy).",
+        },
+        {
+            "id": "survey_error",
+            "title": "Survey estimates have margins of error.",
+            "text": "ACS figures come from a sample; values marked low-reliability can be far "
+            "off and are never used to rank areas.",
+        },
+        {
+            "id": "boundaries",
+            "title": "Boundaries matter.",
+            "text": 'Different area boundaries give different "worst" areas; shared blocks '
+            "count in each overlapping area, and city totals count each resident once.",
+        },
+    ]
+
+
 def build_report(
     cfg: RegionConfig,
     metrics: pd.DataFrame,
@@ -492,17 +550,6 @@ def build_report(
     wide = shares.pivot(index="area_id", columns="threshold_min", values="pct_within")
     m = m.join(wide.rename(columns=lambda t: f"pct_{t}"))
     types = sorted(set(m["area_type"]) - {CITY_TYPE})
-    not_parks = ""
-    if cfg.parks is not None and cfg.parks.subtract_reasons:
-        values = [
-            v.replace("_", " ")
-            for r in cfg.parks.subtract_reasons
-            for vs in cfg.parks.exclude_tags.get(r, {}).values()
-            for v in vs
-        ]
-        if values:
-            listed = ", ".join(values[:-1]) + (" or " if len(values) > 1 else "") + values[-1]
-            not_parks = f" and areas tagged {listed}"
     code = record["code"]
     lines = [
         f"# Area metrics: {cfg.name}",
@@ -785,24 +832,7 @@ def build_report(
     lines += [
         "## 9. Caveats (draft text for the map)",
         "",
-        f"- **Distances are walking routes on OpenStreetMap paths**, at "
-        f"{cfg.analysis.walk_speed_kmh} km/h, from each census block's interior point to the "
-        "nearest point where a path meets a park. Missing or wrong paths in OpenStreetMap "
-        "change the result; steep hills, busy crossings and sidewalk quality are not "
-        "modelled.",
-        "- **Each block is one point.** Everyone in a block is treated as living at the same "
-        "spot, so large blocks are less precise.",
-        "- **What counts as a park** comes from OpenStreetMap tags and the project's rules "
-        "(decision log D-018): public parks and natural areas count; areas closed to the "
-        f"public{not_parks} do not.",
-        "- **Demographics are context, not cause.** Showing car-free households or people of "
-        "color next to park access does not mean one causes the other. Patterns across "
-        "areas say nothing about any individual household (the ecological fallacy).",
-        "- **Survey estimates have margins of error.** ACS figures come from a sample; values "
-        "marked low-reliability can be far off and are never used to rank areas.",
-        '- **Boundaries matter.** Different area boundaries give different "worst" areas; '
-        "shared blocks count in each overlapping area, and city totals count each resident "
-        "once.",
+        *[f"- **{c['title']}** {c['text']}" for c in caveats(cfg)],
         "",
     ]
     return "\n".join(lines)

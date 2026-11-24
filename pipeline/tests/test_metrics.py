@@ -133,3 +133,8 @@ def test_record_has_inputs_and_summary(
     assert {"block_access", "tiger_tabblock20", "area_membership"} <= set(record["inputs"])
     assert record["summary"]["population"] == 70
     assert record["summary"]["areas"] == {"district": 2, "neighborhood": 2}
+    # One source for the map caveats (D-023 Q9): the record carries them, the report shows them.
+    caveats = record["summary"]["caveats"]
+    assert [c["id"] for c in caveats][:2] == ["walk_network", "block_points"]
+    report = (result.run_dir / METRICS_FILES["report"]).read_text()  # type: ignore[operator]
+    assert all(c["title"] in report for c in caveats)

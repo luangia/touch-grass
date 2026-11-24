@@ -1,6 +1,6 @@
 # Project Plan — TouchGrass
 
-> Status: **Stages 1–7 complete. Stage 8 being prepared** (not approved for implementation). Stages 9–11 not started.
+> Status: **Stages 1–7 complete. Stage 8 implemented (2026-11-23), awaiting your review.** Stages 9–11 not started.
 > See [ARCHITECTURE.md](ARCHITECTURE.md) for design and [DECISIONS.md](DECISIONS.md) for the trade-offs behind it.
 
 ## 1. Problem
@@ -230,7 +230,7 @@ Each stage: objective, functional requirements, concepts, dependencies, tasks, d
 
 ### Stage 8 — FastAPI backend
 
-> **Being prepared.** [Lesson](learning/stage-08-fastapi-backend.md); decisions Q1–Q9 pending. The prototype puts block tiles at z12–14 (every tile < 50 ms) and simplified neighborhood GeoJSON at 120 KiB.
+> **Implemented 2026-11-23, awaiting review.** [Lesson](learning/stage-08-fastapi-backend.md) (§13 built, §14 results and review items); decisions in D-023. `api/` project, 10 endpoints, 35 tests.
 
 **Objective.** Read-only, typed API exposing regions, areas, metrics, parks, and block tiles.
 

@@ -456,3 +456,21 @@ TouchGrass is a public portfolio project, so clipping, reprojecting or overlayin
   - A proportion uses √(MOE_X² − p²·MOE_Y²)/Y, falling back to the ratio formula when the radicand is negative.
   - p and 1 − p share one MOE.
 
+
+---
+
+## D-023 — API: separate read-only service over the schema; GeoJSON + MVT built in SQL
+
+**Status:** Accepted (2026-11-23, Stage 8 Q1–Q9, "Approve as recommended")
+
+| # | Choice |
+|---|---|
+| Q1 | The API is its own uv project in `api/` (package `touchgrass_api`), with **no runtime dependency on the pipeline**. Their contract is the database schema: the API checks the migration version at startup. The pipeline is a dev-only dependency, used to seed the test database with the synthetic region. |
+| Q2 | Plain `def` endpoints (FastAPI runs them in a thread pool) with a `psycopg_pool.ConnectionPool`. |
+| Q3 | Raw parameterized SQL through psycopg. GeoJSON FeatureCollections and MVT tiles are built in PostGIS. Identifiers that vary (ranking metric) come from a fixed whitelist keyed by an Enum, never from request text. |
+| Q4 | v1 answers for the **latest** analysis run only. It's resolved once per request, and its `run_id` is returned in every response. |
+| Q5 | GeoJSON geometry is simplified per polygon to 5 m in the region's analysis CRS (`ST_SimplifyPreserveTopology`), with 6 decimals. |
+| Q6 | Block tiles at z12–14 only (MapLibre overzooms beyond). Empty tiles return 204. Geometry is transformed per request; no stored 3857 column. |
+| Q7 | gzip (`GZipMiddleware`), `ETag` from the run id with `Cache-Control`, and CORS from a configured origin list (GET only). |
+| Q8 | Every API session is read-only (`default_transaction_read_only = on`). The startup check fails if the schema version differs. A dedicated SELECT-only role is deferred to deployment (Stage 11). |
+| Q9 | The map caveat text has one source: the pipeline writes it into the metrics run record (`summary.caveats`), and `/methodology` serves it. |

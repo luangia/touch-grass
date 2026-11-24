@@ -50,7 +50,7 @@ TouchGrass is a classic **batch-analysis + read-only serving** GIS system. The e
 | Source adapters | `pipeline/src/touchgrass/sources/` | One adapter per source type: `http` (streaming, SHA-256 manifests, cache), `arcgis` (paged query), `tiger`, `acs` (bulk summary file), `osm` (Geofabrik extract + MD5, pyosmium area extraction) | Contain analysis logic |
 | Pipeline steps | `pipeline/src/touchgrass/pipeline/` | `sources` (raw input list), `fetch` (network), `process` (offline → GeoParquet), `validate` (hard/soft checks → `validation.json`) | Download inside `process` |
 | Database | `db/` (migrations, SQL) | Persist normalized data + results, enforce constraints | Hold raw downloads |
-| API | `api/` | Read-only queries, serialization, validation | Run heavy analysis |
+| API | `api/` (own uv project, package `touchgrass_api`; D-023) | Read-only queries, serialization, validation; GeoJSON and MVT built in PostGIS | Run heavy analysis; import the pipeline (the schema is the contract) |
 | Frontend | `web/` | Visualization, interaction, explanation | Compute metrics itself |
 
 ## 3. Data flow (one region, end to end)
@@ -185,6 +185,17 @@ Weighted median distance uses each block's population as its weight (so an empty
 | `GET /health` | Liveness + DB check |
 
 Conventions: snake_case JSON, Pydantic response models, `404` for unknown region/area, `422` for invalid params, OpenAPI docs at `/docs`. No auth (public, read-only data).
+
+**As built (Stage 8, D-023):**
+- **Latest run:** every endpoint answers for the latest analysis run and returns its `run_id`, which is also the `ETag` (`304` on revalidation).
+- **`areas`:** requires `type` and takes `threshold` (default: the underserved threshold).
+- **`rankings`:**
+  - `metric` ∈ `pct_within` / `underserved_pop` / `priority_score`, mapped to fixed SQL expressions.
+  - The share and priority rankings include only areas with at least `min_residents_for_ranking` residents.
+- **Block tiles:** z12–14 only (`422` outside that range), `204` when a tile is empty, layer `blocks` with `geoid20`, `pop20`, `reachable`, `network_m`, `walk_min`, `nearest_park_id`, `parks_reachable`, `reachable_park_ha`.
+- **GeoJSON:** simplified to 5 m in the analysis CRS, 6 decimals.
+- **Middleware:** gzip above 1 KB; CORS from `TOUCHGRASS_CORS_ORIGINS`, GET only.
+- **Sessions:** read-only. The app refuses to start against a schema version other than the one it expects.
 
 ## 7. Multi-region design
 

@@ -1,6 +1,6 @@
 # Stage 8: FastAPI Backend
 
-> Status: **prepared, not implemented.** Code snippets show the planned approach.
+> Status: **implemented 2026-11-23, awaiting your review.** §13 is what was built, §14 the results on Portland, §15 the answers to §12, and §16 where the build departed from the plan.
 > Numbers marked **(prototype 2026-11-23)** come from throwaway SQL run against the loaded dev database (run `7c1fc6efaf00effa`, commit `0b7fd58`) from the scratch area. No project code was changed.
 
 ## 1. Objective and expected outcome
@@ -273,3 +273,57 @@ api/                                  (NEW, its own uv project; does not import 
 - PostGIS manual: `ST_AsMVT`, `ST_AsMVTGeom`, `ST_TileEnvelope`, `ST_SimplifyPreserveTopology`, `ST_CoverageSimplify`.
 - FastAPI documentation: dependencies, response models, middleware (CORS, GZip).
 - psycopg 3 documentation: connection pools, server-side parameter binding.
+
+## 13. What was built (2026-11-23)
+
+| Piece | Where | What it does |
+|---|---|---|
+| Project | `api/pyproject.toml`, `api/uv.lock` | FastAPI 0.162, uvicorn, psycopg 3.3 + psycopg-pool. Same `exclude-newer` cutoff as the pipeline. Dev-only: httpx, mapbox-vector-tile, and the pipeline (test seeding) |
+| Settings | `settings.py` | `DATABASE_URL` / `POSTGRES_*` / repo `.env`, the same rules as the pipeline but re-implemented; `TOUCHGRASS_CORS_ORIGINS` |
+| Database | `db.py` | Pool of autocommit, **read-only** connections (`default_transaction_read_only`, 10 s statement timeout); `EXPECTED_SCHEMA_VERSION = 8`; startup refuses another version |
+| Dependencies | `deps.py` | Connection per request; region or 404; latest run and its metrics record; threshold and area-type checks; ETag / `Cache-Control` / 304 |
+| Models | `models.py` | Pydantic response models (`extra="forbid"`) for everything except GeoJSON and tiles |
+| Routes | `routers/regions.py`, `areas.py`, `layers.py`, `/health` in `main.py` | The 10 endpoints of §8.1. GeoJSON built by `json_build_object` + `ST_AsGeoJSON`; tiles by `ST_TileEnvelope` → `ST_AsMVTGeom` → `ST_AsMVT`; rankings through an Enum → fixed SQL map |
+| Pipeline change (Q9) | `pipeline/metrics.py` `caveats()` | The caveat list is generated once, written to `summary.caveats` in the metrics run record, and rendered in the report. `/methodology` serves it |
+| Tests | `api/tests/` (35) + 1 pipeline assertion | Seeded `<db>_apitest` (the pipeline's synthetic region, end to end). Contracts, 16 error cases (404/422, injection-shaped input), GeoJSON structure (longitude first), MVT decode, empty tile, ETag/304, gzip floor, CORS allow/deny, read-only session, schema-mismatch startup, OpenAPI path list, region-name guard, p95 latency on Portland (`-m data`) |
+| Dev server | `.claude/launch.json` | `uv run --directory api uvicorn --factory touchgrass_api.main:create_app` |
+
+**Bugs and surprises:**
+- **The CTE trap from Stage 4, again.** The tile query's `WHERE b.geom IS NOT NULL` was pushed down into the inlined CTE, so `ST_AsMVTGeom` ran twice per block (it shows up in the plan's scan *Filter*). `AS MATERIALIZED` fixed it: z12 p95 108 → 69 ms. Decoded tiles are identical (10,933 features at z12, 0 differences); only the row order changes.
+- **Ruled out first:** parallel aggregation (no change with workers off), and the attribute count (slimming made tiles 32% smaller but no faster).
+- **The gzip test** first asserted compression on the synthetic parks layer, which is 360 bytes, below the 1 KB floor. The test now checks both sides of the floor.
+- **mypy** needed the pipeline marked untyped (it ships no `py.typed`), and Starlette warns that its TestClient will move from httpx to httpx2. The warning is filtered.
+
+## 14. Results on Portland (2026-11-23, run `7c1fc6efaf00effa`)
+
+Measured through the app in-process, 20 requests each, gzip on:
+
+| Endpoint | p50 | p95 | Body (decoded) |
+|---|---|---|---|
+| `areas?type=neighborhood` | 43 ms | 197 ms | 147 KiB (93 features + metrics) |
+| `areas?type=council_district` | 20 ms | 21 ms | 43 KiB |
+| `parks` | 79 ms | 90 ms | 318 KiB |
+| `rankings?type=neighborhood` | 4 ms | 7 ms | 2 KiB |
+| `areas/city/metrics` | 4 ms | 9 ms | 2 KiB |
+| Block tiles over the city, SQL only (after the fix) | z12 p95 69 ms · z13 18 ms · z14 ~9 ms | | max 263 KiB at z12 |
+
+- The acceptance target (area list p95 < 500 ms) holds; the `-m data` test checks it for every area type.
+- All 10 endpoints respond in the running server: `/health` ok at schema 8, `/docs` lists them, and the priority ranking returns North Tabor, Sumner, Alameda.
+
+### Review for you (acceptance)
+1. Open **http://localhost:8000/docs** (the server is running in the browser pane) and try a few endpoints with *Try it out*: `rankings` with `metric=underserved_pop`, the metrics for `neighborhood:16` (North Tabor), and `methodology`.
+2. Is the field set in `areas` GeoJSON what the map should color by? The current set is `pct_within`, `underserved_pop`, `underserved_share`, `median_walk_m`, `priority_score`, `ranked` and `reachable_park_ha_median`.
+
+## 15. Answers to §12
+1. **Index use:** a GiST index stores boxes of the column *as stored* (4326). `cb.geom && ST_Transform(envelope, 4326)` compares the stored column with one constant box, which the index answers directly. `ST_Transform(cb.geom, 3857) && envelope` compares a *computed* value, and no index exists on that expression. So every row must be transformed first.
+2. **Seq scan at z12:** that tile covers about 23% of the blocks. Fetching a quarter of a table through an index means random page reads plus index pages. Reading the whole (small) table sequentially is cheaper. At z14 (~2–3% of blocks) the index wins, and the plan uses it.
+3. **`metric` from the URL:** parameters carry *values*; column names and `ASC`/`DESC` are *syntax* and can't be bound. The Enum makes FastAPI reject anything outside the three names (422), and each name maps to a fixed SQL string, so request text never reaches the SQL. `?metric=1;DROP TABLE` returns 422 (tested).
+4. **Meters, not degrees:** a degree of longitude is 111 km × cos(latitude): 78 km in Portland, 31 km in Anchorage. A 0.0001° tolerance would mean ~8 m in Portland and ~3 m east–west in Anchorage, but 11 m north–south in both. That's direction-dependent and region-dependent. Simplifying in each region's analysis CRS gives the same 5 m everywhere.
+
+## 16. Departures from the plan
+- **`/areas` requires `type`.** There is no sensible default across regions with different area types.
+- **Rankings on `underserved_pop` / `priority_score` require the underserved threshold** (422 otherwise): the database stores them only at that threshold.
+- **`compare`** deduplicates ids and keeps their order; `city` is allowed.
+- **No `pydantic-settings`.** A 60-line settings module covers it, so the dependency list stays at four.
+- **Tile attributes:** all eight were kept, though slimming would save 32% of the bytes. It isn't faster, and Stage 9 can decide what it needs.
+

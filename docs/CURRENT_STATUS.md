@@ -6,21 +6,21 @@ _Last updated: 2026-11-23_
 
 | Item | Status |
 |---|---|
-| Phase | **Stages 1–7 complete. Stage 8 being prepared**, not approved for implementation |
+| Phase | **Stages 1–7 complete. Stage 8 implemented (2026-11-23)**, awaiting your review |
 | Completed stages | 1 Foundations · 2 Boundaries & population · 3 Parks · 4 PostGIS · 5 Walk network · 6 Walking accessibility · 7 Neighborhood metrics (2026-11-23) |
-| Next stage | 8: FastAPI backend. [Lesson](learning/stage-08-fastapi-backend.md). **Not approved for implementation**; decisions pending |
-| Code | `pipeline/`: … + `touchgrass analyze`, `touchgrass metrics`; 242 tests |
-| Database | schema at migration 0008; portland-or loaded (3 analysis runs; latest `7c1fc6efaf00effa`, metrics on clean commit `0b7fd58`) |
-| Git | `main`, 6 commits ahead of `origin`. Stage 8 prep docs uncommitted |
+| Current stage | 8: FastAPI backend. [Lesson](learning/stage-08-fastapi-backend.md) §13–16; decisions D-023. Review items in §14 |
+| Code | `pipeline/`: … + `touchgrass analyze`, `touchgrass metrics`; 242 tests. `api/`: FastAPI, 10 endpoints; 35 tests |
+| Database | schema at migration 0008; portland-or loaded (3 analysis runs; latest `7c1fc6efaf00effa`, metrics regenerated with the Stage 8 caveat change, uncommitted) |
+| Git | `main`, 8 commits ahead of `origin`. Stage 8 implementation uncommitted |
 
 ## Currently being worked on
 
-- Stage 8 preparation. Waiting on decisions and implementation approval.
+- Stage 8 implemented: all endpoints tested; the dev server runs (`.claude/launch.json` → `api`). Waiting on your review (lesson §14).
 - ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
 
-See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff). Stage 2 added D-015 (data-source choices) and amended D-007 (Census interior points). Stage 3 added D-017 (dated OSM extracts + pyosmium; uv-managed Python) and D-018 (park rules and merging; amendment 2 adds `veto_tags`). Stage 4 added D-019 (COPY loading, SQL migrations, 4326-only storage, long ACS table, test database, settings). Stage 6 added D-021 (SciPy engine, no cutoff, same-edge rule, run ids from content) and fixed two Stage 5 contact bugs. Stage 7 added D-022 (areas, rankings, priority, reachable park area, ACS allocation, reliability) and amended D-011 (priority formula). Stage 5 added D-020 (offline OSMnx build, walk filter with shared-use paths re-admitted, largest component plus a report, edge snapping, UTM edge weights) and amended D-006 (no sampled fallback).
+See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff). Stage 2 added D-015 (data-source choices) and amended D-007 (Census interior points). Stage 3 added D-017 (dated OSM extracts + pyosmium; uv-managed Python) and D-018 (park rules and merging; amendment 2 adds `veto_tags`). Stage 4 added D-019 (COPY loading, SQL migrations, 4326-only storage, long ACS table, test database, settings). Stage 6 added D-021 (SciPy engine, no cutoff, same-edge rule, run ids from content) and fixed two Stage 5 contact bugs. Stage 8 added D-023 (separate read-only API project; SQL-built GeoJSON and MVT; z12–14 tiles; ETag by run). Stage 7 added D-022 (areas, rankings, priority, reachable park area, ACS allocation, reliability) and amended D-011 (priority formula). Stage 5 added D-020 (offline OSMnx build, walk filter with shared-use paths re-admitted, largest component plus a report, edge snapping, UTM edge weights) and amended D-006 (no sampled fallback).
 
 ## How to run what exists
 
@@ -38,8 +38,8 @@ uv run pytest                            # -m data / -m db to select; db tests u
 
 ## Next steps
 
-1. Answer the Stage 8 decisions (lesson §9).
-2. Approve implementation: `/learn:implement-stage 8`.
+1. Review Stage 8: try `/docs` (lesson §14).
+2. On approval: commit, rerun `metrics` on the clean commit and reload, then `/learn:advance` to Stage 9 (map).
 
 ## Blockers / risks being watched
 
