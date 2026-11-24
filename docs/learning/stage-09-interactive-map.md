@@ -276,3 +276,22 @@ The frontend **computes no metrics** (ARCHITECTURE §2): it only chooses colors 
 - **Dev-only `window.__map`** for the scripted browser check and console debugging; it isn't present in production builds.
 - **The panel's "About these numbers"** shows the caveats and source attributions now (RLIS requires the attribution); the full methodology page remains Stage 10.
 
+## 17. Your review and the changes it led to (2026-11-23)
+
+You asked for four changes. Here is the reasoning on each, then what was built.
+
+| Your point | Assessment | Built |
+|---|---|---|
+| 1. Two kinds of information: residents' share and the walk from a block. Split them into two views | Agreed, and it was the main source of confusion. The zoom level silently changed what a color meant, both legends were always shown, and the walk-time toggle did nothing to the blocks | A **Show** switch: *Residents near a park* / *Walk from each block*, in the URL. The walk-time choice and the matching legend appear only where they apply. Block tiles start at z12, so switching zooms in, and a "zoom in" note replaces an empty map |
+| 2. "Residents within 15 min, by neighborhood" is confusing | Agreed. "Nature" would overclaim, because the park rules count mapped parks and natural areas but exclude golf courses, cemeteries and the zoo | Legend: "Residents who live within a 15-minute walk of a park or natural area"; items "50%–70% of residents". Panel headline: "**54%** of residents live within a 10-minute walk of a park or natural area." |
+| 3. Limit panning to around the neighboring states, and show the coast | Agreed, but derived from the region's bbox (+600 km) rather than listing states: there's no state geometry in the data, and naming states in code would break D-004 | `maxBounds` from `expandBounds(bbox, 600 km)` (unit-tested, Mercator-clamped). For Portland: all of Oregon and Washington, the coast, and into Idaho, Nevada and California. My first try, 400 km, measured in the browser, cut off eastern Oregon |
+| 4. Highlight the clicked block; clearer block info, including its neighborhood | Agreed, plus the **nearest park's name**, which turns a number into an answer | Black outline on the selected block. The panel section, headed **Census block**, shows: "In Mt. Tabor" (linked); a swatch and "**1,222 m** to **Frazer Park**"; "about a 15 min walk, **farther than the 10-minute line**"; residents and parks within reach; the block id in small print |
+
+**Found along the way:**
+- **MapLibre's CSS beats yours if it loads later.** `.maplibregl-map { position: relative }` overrode `.map { position: absolute }` after the map moved into a wrapper, leaving a 0-px-high map. Fixed with a more specific selector.
+- **ETag = run id isn't enough.** I added the park name to the tiles without a new analysis run, so the browser's cached tiles were still "current" by ETag. The ETag now includes a response-format version, and the API test pins it. The general lesson: **a cache key must cover everything that changes the bytes**: data *and* code.
+- **"62%" appeared twice** once the headline was added, so the test now reads the share list by its accessible name, which is also a screen-reader improvement.
+- **`PARK_COLOR`** moved from the map module to the style module. Colors belong with the style, and the tests mock the map module.
+
+**Tests:** web 25 → 31 (pan limit, block class lookup, block-first panel with park name and area link, unnamed park and no route, plain-words headline, blocks view hides the walk-time choice). API 35 (+ park name and ETag version assertions).
+

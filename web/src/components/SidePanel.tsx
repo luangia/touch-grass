@@ -4,7 +4,8 @@ import type { AreaMetrics, Methodology, RegionDetail } from "../api/client";
 import type { AreaProperties } from "../api/geojson";
 import { displayName, int, meters, minutes, pct } from "../format";
 import type { BlockProperties } from "../map/MapView";
-import { SHARE_COLORS, shareClassIndex } from "../map/style";
+import { type BlockClass, blockClassOf, SHARE_COLORS, shareClassIndex } from "../map/style";
+import type { Mode } from "../state/url";
 
 export type Selection = {
   areaId: string | null;
@@ -17,13 +18,16 @@ export type Selection = {
 
 type Props = {
   region: RegionDetail;
+  mode: Mode;
   threshold: number;
+  blockClasses: BlockClass[];
   selection: Selection;
   hovered: AreaProperties | null;
   methodology: Methodology | null;
   onSelectArea: (areaId: string) => void;
 };
 
+const PARKS = "a park or natural area";
 const metersPerMinute = (r: RegionDetail) => (r.walk_speed_kmh * 1000) / 60;
 
 function rankingFloor(m: Methodology | null): number | null {
@@ -31,18 +35,33 @@ function rankingFloor(m: Methodology | null): number | null {
   return metrics?.metrics?.min_residents_for_ranking ?? null;
 }
 
+function AreaLink(props: { area: AreaProperties; onSelect: (id: string) => void }) {
+  return (
+    <button type="button" className="link" onClick={() => props.onSelect(props.area.area_id)}>
+      {displayName(props.area.name, props.area.area_type)}
+    </button>
+  );
+}
+
 function AreaSection(props: Props & { area: AreaMetrics }) {
   const { area, region, threshold } = props;
   const floor = rankingFloor(props.methodology);
   const u = region.underserved_minutes;
+  const current = area.thresholds.find((t) => t.threshold_min === threshold);
   return (
     <section aria-label="Selected area">
       <h2>{displayName(area.name, area.area_type)}</h2>
+      {current ? (
+        <p className="headline">
+          <strong>{pct(current.pct_within)}</strong> of residents live within a {threshold}-minute
+          walk of {PARKS}.
+        </p>
+      ) : null}
       <p className="muted">{int(area.pop_total)} residents (2020 Census)</p>
-      <ul className="shares">
+      <ul className="shares" aria-label="Share of residents by walk time">
         {area.thresholds.map((t) => (
           <li key={t.threshold_min} className={t.threshold_min === threshold ? "current" : ""}>
-            <span className="label">Within {t.threshold_min} min</span>
+            <span className="label">Within a {t.threshold_min}-min walk</span>
             <span className="bar" aria-hidden="true">
               <span
                 style={{
@@ -56,7 +75,7 @@ function AreaSection(props: Props & { area: AreaMetrics }) {
         ))}
       </ul>
       <dl>
-        <dt>Beyond a {u}-minute walk</dt>
+        <dt>Farther than a {u}-minute walk</dt>
         <dd>
           {int(area.underserved_pop)} residents ({pct(area.underserved_share)})
         </dd>
@@ -65,7 +84,7 @@ function AreaSection(props: Props & { area: AreaMetrics }) {
           {meters(area.median_walk_m)} ({minutes(area.median_walk_m, metersPerMinute(region))}),
           population-weighted median
         </dd>
-        <dt>Park area within {u} min</dt>
+        <dt>Park area within a {u}-minute walk</dt>
         <dd>{area.reachable_park_ha_median.toFixed(1)} ha for the typical resident</dd>
       </dl>
       {!area.ranked && area.area_type !== "city" ? (
@@ -83,13 +102,7 @@ function AreaSection(props: Props & { area: AreaMetrics }) {
               {a.area_id === area.area_id ? (
                 <strong>{displayName(a.name, a.area_type)}</strong>
               ) : (
-                <button
-                  type="button"
-                  className="link"
-                  onClick={() => props.onSelectArea(a.area_id)}
-                >
-                  {displayName(a.name, a.area_type)}
-                </button>
+                <AreaLink area={a} onSelect={props.onSelectArea} />
               )}
             </span>
           ))}
@@ -100,46 +113,100 @@ function AreaSection(props: Props & { area: AreaMetrics }) {
   );
 }
 
-function BlockSection({ block, region }: { block: BlockProperties; region: RegionDetail }) {
+function BlockSection(props: Props & { block: BlockProperties }) {
+  const { block, region } = props;
   const u = region.underserved_minutes;
+  const line = region.thresholds.find((t) => t.minutes === u)?.meters ?? Infinity;
+  const distance = block.reachable ? (block.network_m ?? null) : null;
+  const cls = blockClassOf(props.blockClasses, distance);
+  const parkCount = block.parks_reachable ?? 0;
   return (
-    <section aria-label="Selected block">
-      <h3>This census block</h3>
-      {block.reachable && block.network_m !== null ? (
-        <p>
-          {int(block.pop20)} residents. Walk to the nearest park:{" "}
-          <strong>{meters(block.network_m)}</strong> (about{" "}
-          {minutes(block.network_m, metersPerMinute(region))}).{" "}
-          {block.parks_reachable
-            ? `${block.parks_reachable} park${block.parks_reachable === 1 ? "" : "s"} within ${u} min (${(block.reachable_park_ha ?? 0).toFixed(1)} ha).`
-            : `No park within ${u} min.`}
+    <section aria-label="Selected census block" className="block-section">
+      <h2>Census block</h2>
+      {props.selection.alsoIn.length > 0 ? (
+        <p className="muted">
+          In{" "}
+          {props.selection.alsoIn.map((a, i) => (
+            <span key={a.area_id}>
+              {i > 0 ? " and " : ""}
+              <AreaLink area={a} onSelect={props.onSelectArea} />
+            </span>
+          ))}
         </p>
+      ) : null}
+      {distance !== null ? (
+        <>
+          <p className="headline">
+            <span
+              className="swatch"
+              style={{ background: cls?.color ?? "transparent" }}
+              aria-hidden="true"
+            />
+            <strong>{meters(distance)}</strong> to{" "}
+            {block.nearest_park_name ? (
+              <strong>{block.nearest_park_name}</strong>
+            ) : (
+              "the nearest park"
+            )}
+          </p>
+          <p>
+            About a {minutes(distance, metersPerMinute(region))} walk,{" "}
+            {distance > line ? (
+              <strong>farther than the {u}-minute line</strong>
+            ) : (
+              <>within the {u}-minute line</>
+            )}
+            .
+          </p>
+        </>
       ) : (
-        <p>{int(block.pop20)} residents. No walking route to a park on the mapped paths.</p>
+        <p className="headline">No walking route to a park on the mapped paths.</p>
       )}
+      <p className="muted">
+        {int(block.pop20)} residents ·{" "}
+        {parkCount > 0
+          ? `${parkCount} park${parkCount === 1 ? "" : "s"} within a ${u}-minute walk (${(block.reachable_park_ha ?? 0).toFixed(1)} ha)`
+          : `no park within a ${u}-minute walk`}
+      </p>
+      <p className="note">
+        Walks start from one point inside the block (Census block {block.geoid20}).
+      </p>
     </section>
   );
 }
 
 export function SidePanel(props: Props) {
-  const { selection, hovered } = props;
+  const { selection, hovered, mode } = props;
+  const area = selection.metrics ? <AreaSection {...props} area={selection.metrics} /> : null;
+  const block = selection.block ? <BlockSection {...props} block={selection.block} /> : null;
   return (
     <aside className="panel" aria-live="polite">
       {selection.loading ? <p className="muted">Loading…</p> : null}
       {selection.error ? <p className="error">{selection.error}</p> : null}
-      {selection.metrics ? <AreaSection {...props} area={selection.metrics} /> : null}
-      {selection.block ? <BlockSection block={selection.block} region={props.region} /> : null}
+      {/* Lead with what the current view is about. */}
+      {mode === "blocks" ? (
+        <>
+          {block}
+          {area}
+        </>
+      ) : (
+        <>
+          {area}
+          {block}
+        </>
+      )}
       {!selection.metrics && !selection.loading && !selection.block ? (
         <section>
           <h2>Can residents walk to a park?</h2>
           <p>
-            Search by name or click the map. Colors show the share of residents within the selected
-            walk time; zoom in to see each block's walk to the nearest park.
+            {mode === "residents"
+              ? `Colors show the share of residents who live within the selected walk of ${PARKS}. Search by name or click an area.`
+              : `Colors show each census block's walk to the nearest park or natural area. Click a block to see its walk.`}
           </p>
-          {hovered ? (
+          {hovered && mode === "residents" ? (
             <p className="muted">
-              {displayName(hovered.name, hovered.area_type)}: {pct(hovered.pct_within)} within{" "}
-              {props.threshold} min
+              {displayName(hovered.name, hovered.area_type)}: {pct(hovered.pct_within)} of residents
+              within a {props.threshold}-minute walk
             </p>
           ) : null}
         </section>

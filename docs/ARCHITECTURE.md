@@ -192,7 +192,7 @@ Conventions: snake_case JSON, Pydantic response models, `404` for unknown region
 - **`rankings`:**
   - `metric` ∈ `pct_within` / `underserved_pop` / `priority_score`, mapped to fixed SQL expressions.
   - The share and priority rankings include only areas with at least `min_residents_for_ranking` residents.
-- **Block tiles:** z12–14 only (`422` outside that range), `204` when a tile is empty, layer `blocks` with `geoid20`, `pop20`, `reachable`, `network_m`, `walk_min`, `nearest_park_id`, `parks_reachable`, `reachable_park_ha`.
+- **Block tiles:** z12–14 only (`422` outside that range), `204` when a tile is empty, layer `blocks` with `geoid20`, `pop20`, `reachable`, `network_m`, `walk_min`, `nearest_park_id`, `nearest_park_name` (absent for unnamed parks), `parks_reachable`, `reachable_park_ha`.
 - **GeoJSON:** simplified to 5 m in the analysis CRS, 6 decimals.
 - **Middleware:** gzip above 1 KB; CORS from `TOUCHGRASS_CORS_ORIGINS`, GET only.
 - **Sessions:** read-only. The app refuses to start against a schema version other than the one it expects.

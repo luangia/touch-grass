@@ -484,3 +484,29 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 
 **Not verified:** a real phone, and browsers other than the in-app Chromium. Nothing committed.
 
+## 2026-11-23 — Stage 9 review changes ("go ahead with all four")
+
+**What changed** (D-024 amendment; lesson §17):
+- two explicit views;
+- plain-language wording;
+- a pan limit from the bbox + 600 km (400 km, tried first, cut off eastern Oregon);
+- block highlight, with a clearer panel section that includes the nearest park's name.
+
+**API:** tiles carry `nearest_park_name`. The ETag includes `RESPONSE_VERSION = 2`, because cached tiles without names were "unchanged" under a run-only ETag.
+
+**Tests:** web 31, api 35, all passing.
+
+**Browser-checked:**
+- the residents view at z14 and the new wording;
+- the blocks view: walk-time choice hidden, block legend, block outline (feature state `selected: true`), panel leading with the block "In Mt. Tabor";
+- no console errors.
+
+**Park name, verified after a caching detour:**
+- The panel first showed no names. Direct fetches had them, but MapLibre's worker kept getting pre-change tiles from the HTTP cache.
+- A revalidation made before the ETag was versioned had answered 304, renewing the nameless copies' 5-minute freshness.
+- With a cache-busting tile URL, 2,955 of 3,144 blocks carry a name (the rest have unnamed nearest parks). The panel shows "1,222 m to **Frazer Park**".
+- With the versioned ETag this can't recur past one `max-age` (5 min).
+- **Possible follow-up:** put the run and format version in the tile URL itself. Tiles could then be cached as immutable and changes would show instantly.
+
+**Pan limit measured:** 130.5–114.8°W, 40.0–51.0°N with 600 km. 400 km, tried first, cut off eastern Oregon.
+

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   blockClasses,
+  blockClassOf,
   blockColorExpression,
   blockLegend,
   NO_DATA_COLOR,
@@ -80,6 +81,13 @@ describe("block classes", () => {
     expect(() => blockClasses(THRESHOLDS, 12)).toThrow(/not a threshold/);
   });
 
+  it("finds the class of a distance for the panel, matching the map", () => {
+    expect(blockClassOf(classes, 400)).toBe(classes[0]);
+    expect(blockClassOf(classes, 801)).toBe(classes[2]);
+    expect(blockClassOf(classes, 9999)).toBe(classes[3]);
+    expect(blockClassOf(classes, null)).toBeNull();
+  });
+
   it("legend lists the same colors plus no route", () => {
     const legend = blockLegend(classes);
     expect(legend.map((l) => l.color)).toEqual([...classes.map((c) => c.color), NO_ROUTE_COLOR]);
@@ -106,11 +114,11 @@ describe("share classes", () => {
 
   it("legend labels", () => {
     expect(shareLegend().map((l) => l.label)).toEqual([
-      "under 50%",
-      "50%–70%",
-      "70%–85%",
-      "85%–95%",
-      "95% or more",
+      "under 50% of residents",
+      "50%–70% of residents",
+      "70%–85% of residents",
+      "85%–95% of residents",
+      "95% or more of residents",
     ]);
   });
 });

@@ -498,3 +498,17 @@ TouchGrass is a public portfolio project, so clipping, reprojecting or overlayin
 **Version notes (implementation):**
 - **TypeScript 5.9.3, not 7.0:** openapi-typescript 7.13 requires `typescript ^5`.
 - **jsdom 29:** jsdom 30+ declares Node `^22.22 || ^24.15 || >=26` and excludes Node 25, which is installed here.
+
+**Amendment (2026-11-23, after your review of Stage 9: "go ahead with all four"):**
+1. **Two views, chosen explicitly** (`?view=residents|blocks`), replacing the zoom-dependent switch:
+   - **Residents near a park:** areas filled by share at every zoom; the walk-time choice applies; only its legend shows.
+   - **Walk from each block:** blocks colored by walk; areas as outlines; the walk-time choice is hidden, because the block colors show every threshold. Switching in zooms to z12 if needed, and a "zoom in" note replaces an empty map below z12.
+   - **Clicks:** in the residents view a click selects the area; in the blocks view it selects the block, and the panel leads with it.
+2. **Wording:** "% of residents who live within an N-minute walk of a park or natural area" (not "nature", which overclaims what the park rules count). The panel headline says the same in a sentence.
+3. **Pan limit:** the region's bbox from the API plus 600 km on every side (`maxBounds`). Derived from data, so no state or place is named in code. For Portland: 130.5–114.8°W, 40.0–51.0°N (measured in the browser), which is all of Oregon and Washington, the coast, and into Idaho, Nevada and California (400 km, tried first, cut off eastern Oregon).
+4. **Block selection:** the clicked block is outlined (feature state; `promoteId: geoid20` on the tile source). Its panel section shows: the area(s) it's in, linked; the distance and the **name of the nearest park**; within or beyond the underserved line, with its color; residents; parks within reach.
+
+**API changes this required:**
+- Block tiles gain `nearest_park_name`.
+- The ETag gains a response-format version (`RESPONSE_VERSION`, now 2). Without it, a browser keeps a pre-change tile for the same run: the 304 says "unchanged" because the run is unchanged. Found when the panel showed no park names right after the change. After a format change a cached copy can still be served until its `max-age` (5 min) expires.
+

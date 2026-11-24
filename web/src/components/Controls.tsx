@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 
 import type { AreaFeature } from "../api/geojson";
 import { displayName, typeLabel } from "../format";
+import { type Mode, MODES } from "../state/url";
 
 export function SearchBox(props: {
   features: AreaFeature[];
@@ -86,6 +87,32 @@ export function AreaTypeToggle(props: {
           <span>
             {typeLabel(t.area_type, true)} ({t.areas})
           </span>
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+const MODE_LABELS: Record<Mode, string> = {
+  residents: "Residents near a park",
+  blocks: "Walk from each block",
+};
+
+/** The two questions the map answers, one at a time (D-024 amendment). */
+export function ModeToggle(props: { value: Mode; onChange: (mode: Mode) => void }) {
+  return (
+    <fieldset className="control segmented">
+      <legend>Show</legend>
+      {MODES.map((m) => (
+        <label key={m}>
+          <input
+            type="radio"
+            name="mode"
+            value={m}
+            checked={m === props.value}
+            onChange={() => props.onChange(m)}
+          />
+          <span>{MODE_LABELS[m]}</span>
         </label>
       ))}
     </fieldset>

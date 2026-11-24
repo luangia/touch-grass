@@ -20,6 +20,8 @@ const COOL = ["#2c7bb6", "#74add1", "#abd9e9"];
 const WARM = ["#fdae61", "#f46d43", "#d7191c"];
 export const NO_ROUTE_COLOR = "#9e9e9e";
 export const NO_DATA_COLOR = "#e0e0e0";
+/** Parks: a dark green no share or distance class uses. */
+export const PARK_COLOR = "#1b7837";
 
 /** ColorBrewer YlGnBu, 5 classes: low share = light, high share = dark. */
 export const SHARE_COLORS = ["#ffffcc", "#a1dab4", "#41b6c4", "#2c7fb8", "#253494"];
@@ -100,6 +102,12 @@ export function shareColorExpression(): ExpressionSpecification {
   ] as ExpressionSpecification;
 }
 
+/** The class a walking distance falls in (null = no route), for the panel's swatch. */
+export function blockClassOf(classes: BlockClass[], meters: number | null): BlockClass | null {
+  if (meters === null) return null;
+  return classes.find((c) => c.maxMeters === null || meters <= c.maxMeters) ?? null;
+}
+
 export function shareLegend(): LegendItem[] {
   const pct = (x: number) => `${Math.round(x * 100)}%`;
   const bounds = [0, ...SHARE_BREAKS, 1];
@@ -107,10 +115,10 @@ export function shareLegend(): LegendItem[] {
     color,
     label:
       i === 0
-        ? `under ${pct(bounds[1]!)}`
+        ? `under ${pct(bounds[1]!)} of residents`
         : i === SHARE_COLORS.length - 1
-          ? `${pct(bounds[i]!)} or more`
-          : `${pct(bounds[i]!)}–${pct(bounds[i + 1]!)}`,
+          ? `${pct(bounds[i]!)} or more of residents`
+          : `${pct(bounds[i]!)}–${pct(bounds[i + 1]!)} of residents`,
   }));
 }
 

@@ -14,13 +14,13 @@ import {
   type RegionSummary,
 } from "./api/client";
 import { type AreaCollection, type AreaProperties, bboxOf } from "./api/geojson";
-import { AreaTypeToggle, SearchBox, ThresholdToggle } from "./components/Controls";
+import { AreaTypeToggle, ModeToggle, SearchBox, ThresholdToggle } from "./components/Controls";
 import { Legend } from "./components/Legend";
 import { type Selection, SidePanel } from "./components/SidePanel";
 import { typeLabel } from "./format";
 import { type Bounds, type MapClick, MapView } from "./map/MapView";
-import { blockClasses, blockLegend, shareLegend } from "./map/style";
-import { formatView, parseView, type ViewState } from "./state/url";
+import { blockClasses, blockLegend, PARK_COLOR, shareLegend } from "./map/style";
+import { formatView, type Mode, parseView, type ViewState } from "./state/url";
 
 const BASEMAP: string =
   import.meta.env.VITE_BASEMAP_STYLE ?? "https://tiles.openfreemap.org/styles/positron";
@@ -109,6 +109,7 @@ export function App() {
       ? view.areaType
       : defaultAreaType(region)
     : null;
+  const mode: Mode = view.mode ?? "residents";
   const threshold = region
     ? view.threshold !== null && region.thresholds.some((t) => t.minutes === view.threshold)
       ? view.threshold
@@ -165,11 +166,24 @@ export function App() {
     flewToUrlArea.current = true;
   }, [areas, view.area]);
 
+  // Residents view: a click selects the area. Blocks view: it selects the block; the area
+  // stays as it was and is linked from the block's section (D-024 amendment).
   const onMapClick = useCallback(
     (hit: MapClick) => {
-      setSelection((s) => ({ ...s, alsoIn: hit.areas, block: hit.block }));
+      if (mode === "blocks") {
+        setSelection((s) => ({ ...s, alsoIn: hit.areas, block: hit.block }));
+        return;
+      }
+      setSelection((s) => ({ ...s, alsoIn: hit.areas, block: null }));
       const first = hit.areas[0];
       if (first) update({ area: first.area_id });
+    },
+    [mode, update],
+  );
+  const changeMode = useCallback(
+    (m: Mode) => {
+      if (m === "residents") setSelection((s) => ({ ...s, block: null }));
+      update({ mode: m });
     },
     [update],
   );
@@ -204,11 +218,15 @@ export function App() {
             areaType={areaType}
             onSelect={(id) => selectArea(id, true)}
           />
-          <ThresholdToggle
-            thresholds={region.thresholds}
-            value={threshold}
-            onChange={(t) => update({ threshold: t }, false)}
-          />
+          <ModeToggle value={mode} onChange={changeMode} />
+          {/* Block colors already show every threshold, so the walk-time choice is for areas. */}
+          {mode === "residents" ? (
+            <ThresholdToggle
+              thresholds={region.thresholds}
+              value={threshold}
+              onChange={(t) => update({ threshold: t }, false)}
+            />
+          ) : null}
           <AreaTypeToggle
             types={region.area_types}
             value={areaType}
@@ -219,9 +237,11 @@ export function App() {
       <MapView
         key={region.region_id}
         region={region}
+        mode={mode}
         areas={areas}
         blockClasses={classes}
         selectedArea={view.area}
+        selectedBlock={selection.block?.geoid20 ?? null}
         focus={focus}
         basemapStyle={BASEMAP}
         onHoverArea={setHovered}
@@ -231,13 +251,19 @@ export function App() {
       {/* Collapsible: open on wide screens, closed on phones where it would cover the map. */}
       <details className="legends" open={WIDE}>
         <summary>Legend</summary>
-        <Legend
-          title={`Residents within ${threshold} min, by ${typeLabel(areaType).toLowerCase()}`}
-          items={shareLegend()}
-          note="Dashed outline: too few residents to rank."
-        />
-        <Legend title="Walk to the nearest park, by block (zoom in)" items={blockLegend(classes)} />
-        <Legend title="" items={[{ color: "#1b7837", label: "Park" }]} />
+        {mode === "residents" ? (
+          <Legend
+            title={`Residents who live within a ${threshold}-minute walk of a park or natural area, by ${typeLabel(areaType).toLowerCase()}`}
+            items={shareLegend()}
+            note="Dashed outline: too few residents to rank."
+          />
+        ) : (
+          <Legend
+            title="Walk from each census block to the nearest park or natural area"
+            items={blockLegend(classes)}
+          />
+        )}
+        <Legend title="" items={[{ color: PARK_COLOR, label: "Park or natural area" }]} />
       </details>
       {mapError ? (
         <p className="error map-error" role="alert">
@@ -249,7 +275,9 @@ export function App() {
       ) : null}
       <SidePanel
         region={region}
+        mode={mode}
         threshold={threshold}
+        blockClasses={classes}
         selection={selection}
         hovered={hovered}
         methodology={methodology}

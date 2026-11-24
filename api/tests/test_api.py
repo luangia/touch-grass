@@ -11,7 +11,7 @@ import pytest
 from conftest import REGION, Seeded, url
 from fastapi.testclient import TestClient
 
-from touchgrass_api import db, main
+from touchgrass_api import db, deps, main
 from touchgrass_api.models import AreaMetricsResponse, Comparison, Methodology, Ranking
 from touchgrass_api.settings import Settings
 
@@ -188,6 +188,8 @@ def test_block_tile_over_the_city(client: TestClient, seeded: Seeded) -> None:
     assert sorted(p["geoid20"] for p in props) == seeded.populated_blocks
     assert all(p["network_m"] > 0 and p["walk_min"] > 0 for p in props)
     assert all(p["parks_reachable"] >= 1 for p in props)
+    # The nearest park is named in the tile (the synthetic one is "West Woods").
+    assert {p["nearest_park_name"] for p in props} == {"West Woods"}
 
 
 def test_tile_outside_the_region_is_empty(client: TestClient) -> None:
@@ -211,6 +213,8 @@ def test_etag_and_not_modified(client: TestClient, seeded: Seeded) -> None:
     r = client.get(url("/parks"))
     etag = r.headers["etag"]
     assert seeded.run_id in etag and "max-age" in r.headers["cache-control"]
+    # A new response format must invalidate old copies even for the same run.
+    assert etag.endswith(f'-v{deps.RESPONSE_VERSION}"')
     again = client.get(url("/parks"), headers={"if-none-match": etag})
     assert again.status_code == 304 and again.content == b""
     assert client.get(url("/parks"), headers={"if-none-match": '"stale"'}).status_code == 200

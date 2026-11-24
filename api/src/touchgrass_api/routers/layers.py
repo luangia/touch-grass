@@ -59,12 +59,16 @@ WITH env AS (SELECT ST_TileEnvelope(%(z)s, %(x)s, %(y)s) AS e),
 b AS MATERIALIZED (
     SELECT ST_AsMVTGeom(ST_Transform(cb.geom, 3857), env.e, {EXTENT}, {BUFFER}, true) AS geom,
            cb.geoid20, ba.pop20, ba.reachable, ba.network_m, ba.walk_min,
-           ba.nearest_park_id, r.parks_reachable, r.reachable_park_ha
+           ba.nearest_park_id, pk.name AS nearest_park_name, r.parks_reachable,
+           r.reachable_park_ha
     FROM env, {SCHEMA}.census_blocks cb
     JOIN {SCHEMA}.block_access ba
       ON ba.region_id = cb.region_id AND ba.geoid20 = cb.geoid20 AND ba.run_id = %(run)s
     LEFT JOIN {SCHEMA}.block_park_reach r
       ON r.region_id = ba.region_id AND r.run_id = ba.run_id AND r.geoid20 = ba.geoid20
+    -- Unnamed parks have no name: the attribute is then absent from the tile (MVT drops NULLs).
+    LEFT JOIN {SCHEMA}.parks pk
+      ON pk.region_id = ba.region_id AND pk.park_id = ba.nearest_park_id
     WHERE cb.region_id = %(region)s
       AND cb.geom && ST_Transform(env.e, 4326)
 )

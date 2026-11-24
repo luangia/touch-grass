@@ -15,6 +15,12 @@ from fastapi import Path as PathParam
 
 from touchgrass_api.db import SCHEMA, Conn
 
+# Part of every ETag. A cached response is valid only for the same run AND the same response
+# format: bump this whenever an endpoint's output changes for an unchanged run (e.g. a new tile
+# attribute), or browsers keep serving the old version (found in Stage 9: tiles without park
+# names after nearest_park_name was added).
+RESPONSE_VERSION = 2
+
 RegionId = Annotated[str, PathParam(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$", max_length=64)]
 
 
@@ -49,7 +55,7 @@ class RegionCtx:
 
     @property
     def etag(self) -> str:
-        return f'"{self.region_id}-{self.run_id or "none"}"'
+        return f'"{self.region_id}-{self.run_id or "none"}-v{RESPONSE_VERSION}"'
 
 
 def get_region(region_id: RegionId, conn: Annotated[Conn, Depends(get_conn)]) -> RegionCtx:

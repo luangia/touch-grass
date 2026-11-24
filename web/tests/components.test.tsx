@@ -5,6 +5,7 @@ import { bboxOf } from "../src/api/geojson";
 import { AreaTypeToggle, SearchBox, ThresholdToggle } from "../src/components/Controls";
 import { SidePanel, type Selection } from "../src/components/SidePanel";
 import { displayName } from "../src/format";
+import { blockClasses } from "../src/map/style";
 import { formatView, parseView } from "../src/state/url";
 import { AREAS, feature, METHODOLOGY, metrics, REGION, SUMMARY } from "./fixtures";
 
@@ -27,19 +28,23 @@ const EMPTY: Selection = {
 describe("url state", () => {
   it("round-trips and ignores junk", () => {
     const v = {
+      mode: "blocks" as const,
       region: "testville-zz",
       areaType: "neighborhood",
       threshold: 10,
       area: "neighborhood:1",
     };
     expect(parseView(formatView(v))).toEqual(v);
-    expect(parseView("?threshold=abc&region=")).toEqual({
+    expect(parseView("?threshold=abc&region=&view=everything")).toEqual({
+      mode: null,
       region: null,
       areaType: null,
       threshold: null,
       area: null,
     });
-    expect(formatView({ region: null, areaType: null, threshold: null, area: null })).toBe("");
+    expect(
+      formatView({ mode: null, region: null, areaType: null, threshold: null, area: null }),
+    ).toBe("");
   });
 });
 
@@ -98,6 +103,8 @@ describe("toggles", () => {
 describe("SidePanel", () => {
   const base = {
     region: REGION,
+    mode: "residents" as const,
+    blockClasses: blockClasses(REGION.thresholds, REGION.underserved_minutes),
     threshold: 10,
     hovered: null,
     methodology: METHODOLOGY,
@@ -107,7 +114,12 @@ describe("SidePanel", () => {
   it("shows shares per threshold, underserved residents and the typical walk", () => {
     render(<SidePanel {...base} selection={{ ...EMPTY, metrics: metrics() }} />);
     expect(screen.getByRole("heading", { name: "Oak Hollow" })).toBeTruthy();
-    expect(screen.getByText("62%")).toBeTruthy();
+    const bars = screen.getByRole("list", { name: "Share of residents by walk time" });
+    expect(
+      within(bars)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["Within a 5-min walk20%", "Within a 10-min walk62%", "Within a 15-min walk95%"]);
     expect(screen.getByText("760 residents (38%)")).toBeTruthy();
     expect(screen.getByText(/640 m \(8 min\)/)).toBeTruthy();
     expect(screen.queryByText(/left out of rankings/)).toBeNull();
@@ -133,26 +145,65 @@ describe("SidePanel", () => {
     expect(onSelectArea).toHaveBeenCalledWith("neighborhood:2");
   });
 
-  it("describes a clicked block, including no route", () => {
+  it("leads with a clicked block in the blocks view: distance, park, area, the 10-min line", () => {
+    const onSelectArea = vi.fn();
     const block = {
       geoid20: "990010001001001",
       pop20: 12,
       reachable: true,
       network_m: 1000,
       walk_min: 12.5,
+      nearest_park_name: "Willow Green",
       parks_reachable: 0,
       reachable_park_ha: 0,
     };
-    const { rerender } = render(<SidePanel {...base} selection={{ ...EMPTY, block }} />);
-    expect(screen.getByText(/1,000 m/)).toBeTruthy();
-    expect(screen.getByText(/No park within 10 min/)).toBeTruthy();
+    const alsoIn = [AREAS.features[0]!.properties];
+    render(
+      <SidePanel
+        {...base}
+        mode="blocks"
+        onSelectArea={onSelectArea}
+        selection={{ ...EMPTY, block, alsoIn, metrics: metrics() }}
+      />,
+    );
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(headings).toEqual(["Census block", "Oak Hollow"]); // block first in this view
+    expect(screen.getByText("Willow Green")).toBeTruthy();
+    expect(screen.getByText("1,000 m")).toBeTruthy();
+    expect(screen.getByText("farther than the 10-minute line")).toBeTruthy();
+    expect(screen.getByText(/no park within a 10-minute walk/)).toBeTruthy();
+    const section = screen.getByRole("region", { name: "Selected census block" });
+    fireEvent.click(within(section).getByRole("button", { name: "Oak Hollow" }));
+    expect(onSelectArea).toHaveBeenCalledWith("neighborhood:1");
+  });
+
+  it("handles an unnamed park and a block with no route", () => {
+    const block = { geoid20: "990010001001002", pop20: 3, reachable: true, network_m: 300 };
+    const { rerender } = render(
+      <SidePanel {...base} mode="blocks" selection={{ ...EMPTY, block }} />,
+    );
+    expect(screen.getByText(/to the nearest park/)).toBeTruthy();
+    expect(screen.getByText(/within the 10-minute line/)).toBeTruthy();
     rerender(
       <SidePanel
         {...base}
-        selection={{ ...EMPTY, block: { ...block, reachable: false, network_m: null } }}
+        mode="blocks"
+        selection={{ ...EMPTY, block: { geoid20: "990010001001003", pop20: 3, reachable: false } }}
       />,
     );
     expect(screen.getByText(/No walking route/)).toBeTruthy();
+  });
+
+  it("headlines the share in plain words", () => {
+    render(<SidePanel {...base} selection={{ ...EMPTY, metrics: metrics() }} />);
+    expect(
+      screen.getByText(
+        (_, el) =>
+          el?.tagName === "P" &&
+          el.textContent ===
+            "62% of residents live within a 10-minute walk of a park or natural area.",
+      ),
+    ).toBeTruthy();
   });
 
   it("carries the caveats and source attributions from the API", () => {
@@ -196,6 +247,25 @@ describe("App", () => {
     expect((screen.getByLabelText("10 min") as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText("Neighborhoods (3)") as HTMLInputElement).checked).toBe(true);
     await waitFor(() => expect(screen.getByText("3 to choose from")).toBeTruthy());
+  });
+
+  it("the blocks view hides the walk-time choice and swaps the legend", async () => {
+    window.history.replaceState(null, "", "/?view=blocks");
+    stubFetch({
+      "/api/v1/regions/testville-zz/areas?type=neighborhood&threshold=10": AREAS,
+      "/api/v1/regions/testville-zz/methodology": METHODOLOGY,
+      "/api/v1/regions/testville-zz": REGION,
+      "/api/v1/regions": [SUMMARY],
+    });
+    const { App } = await import("../src/App");
+    render(<App />);
+    await waitFor(() => expect(screen.getByLabelText("Walk from each block")).toBeTruthy());
+    expect((screen.getByLabelText("Walk from each block") as HTMLInputElement).checked).toBe(true);
+    expect(screen.queryByLabelText("5 min")).toBeNull();
+    expect(screen.getByText(/Walk from each census block to the nearest park/)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Residents near a park"));
+    await waitFor(() => expect(screen.getByLabelText("5 min")).toBeTruthy());
+    expect(window.location.search).toBe("?view=residents");
   });
 
   it("says clearly when the API is down", async () => {

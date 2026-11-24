@@ -2,8 +2,12 @@
  * The bridge between React (declarative) and MapLibre (imperative), lesson §5.6.
  *
  * The map is created ONCE per region (the parent keys this component by region id).
- * Prop changes are applied with setData / setFeatureState / fitBounds, never by
- * re-creating the map.
+ * Prop changes are applied with setData / setFeatureState / setPaintProperty / easeTo,
+ * never by re-creating the map.
+ *
+ * Two views (D-024 amendment): "residents" fills areas by the share of residents within the
+ * chosen walk; "blocks" colors each census block by its walk to the nearest park, with areas
+ * as outlines. Block tiles exist from z12, so the blocks view asks you to zoom in below that.
  */
 
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -24,26 +28,33 @@ import { useEffect, useRef, useState } from "react";
 import type { RegionDetail } from "../api/client";
 import { api } from "../api/client";
 import type { AreaCollection, AreaProperties } from "../api/geojson";
-import { type BlockClass, blockColorExpression, shareColorExpression } from "./style";
+import type { Mode } from "../state/url";
+import { type Bounds, expandBounds, MAX_PAN_KM } from "./bounds";
+import { type BlockClass, blockColorExpression, PARK_COLOR, shareColorExpression } from "./style";
 
+export type { Bounds } from "./bounds";
+
+/** Attributes of a block in the vector tiles (MVT drops null attributes, hence optional). */
 export type BlockProperties = {
   geoid20: string;
   pop20: number;
   reachable: boolean;
-  network_m: number | null;
-  walk_min: number | null;
-  parks_reachable: number | null;
-  reachable_park_ha: number | null;
+  network_m?: number;
+  walk_min?: number;
+  nearest_park_name?: string;
+  parks_reachable?: number;
+  reachable_park_ha?: number;
 };
 
 export type MapClick = { areas: AreaProperties[]; block: BlockProperties | null };
-export type Bounds = [number, number, number, number];
 
 type Props = {
   region: RegionDetail;
+  mode: Mode;
   areas: AreaCollection | null;
   blockClasses: BlockClass[];
   selectedArea: string | null;
+  selectedBlock: string | null;
   focus: Bounds | null;
   basemapStyle: string;
   onHoverArea: (props: AreaProperties | null) => void;
@@ -56,9 +67,8 @@ maplibregl.setWorkerUrl(workerUrl);
 const AREAS = "areas";
 const PARKS = "parks";
 const BLOCKS = "blocks";
-const BLOCK_MIN_ZOOM = 12; // the API serves block tiles from z12 (D-023 Q6)
+export const BLOCK_MIN_ZOOM = 12; // the API serves block tiles from z12 (D-023 Q6)
 const BLOCK_MAX_ZOOM = 14; // ... to z14; MapLibre overzooms beyond
-const PARK_COLOR = "#1b7837";
 const EMPTY: AreaCollection = {
   type: "FeatureCollection",
   region_id: "",
@@ -74,7 +84,11 @@ function firstLayerOf(map: MLMap, sourceLayer: string): string | undefined {
     ?.id;
 }
 
-function addDataLayers(map: MLMap, region: RegionDetail, classes: BlockClass[]): void {
+/** Areas are opaque in the residents view; in the blocks view transparent but clickable. */
+const areaOpacity = (mode: Mode) => (mode === "residents" ? 1 : 0);
+const blockVisibility = (mode: Mode) => (mode === "blocks" ? "visible" : "none");
+
+function addDataLayers(map: MLMap, region: RegionDetail, classes: BlockClass[], mode: Mode): void {
   const firstSymbol = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
   // Areas go under the basemap's water, roads and labels (D-024 Q4); blocks and parks under
   // its roads; outlines over roads but under labels. Fallback: below the first label.
@@ -88,6 +102,7 @@ function addDataLayers(map: MLMap, region: RegionDetail, classes: BlockClass[]):
     tiles: [api.blockTilesUrl(region.region_id)],
     minzoom: BLOCK_MIN_ZOOM,
     maxzoom: BLOCK_MAX_ZOOM,
+    promoteId: "geoid20", // feature state (the selection outline) needs an id per block
   });
 
   const layers: [LayerSpecification, string | undefined][] = [
@@ -96,12 +111,8 @@ function addDataLayers(map: MLMap, region: RegionDetail, classes: BlockClass[]):
         id: "areas-fill",
         type: "fill",
         source: AREAS,
-        paint: {
-          "fill-color": shareColorExpression(),
-          // Opaque, so overlapping areas don't stack into a darker false signal (lesson §5.5).
-          // Transparent (still clickable) where blocks take over.
-          "fill-opacity": ["step", ["zoom"], 1, BLOCK_MIN_ZOOM, 0],
-        },
+        // Opaque, so overlapping areas don't stack into a darker false signal (lesson §5.5).
+        paint: { "fill-color": shareColorExpression(), "fill-opacity": areaOpacity(mode) },
       },
       belowWater,
     ],
@@ -112,6 +123,7 @@ function addDataLayers(map: MLMap, region: RegionDetail, classes: BlockClass[]):
         source: BLOCKS,
         "source-layer": "blocks",
         minzoom: BLOCK_MIN_ZOOM,
+        layout: { visibility: blockVisibility(mode) },
         paint: { "fill-color": blockColorExpression(classes), "fill-opacity": 0.85 },
       },
       belowRoads,
@@ -164,6 +176,21 @@ function addDataLayers(map: MLMap, region: RegionDetail, classes: BlockClass[]):
       },
       firstSymbol,
     ],
+    [
+      {
+        id: "blocks-selected",
+        type: "line",
+        source: BLOCKS,
+        "source-layer": "blocks",
+        minzoom: BLOCK_MIN_ZOOM,
+        layout: { visibility: blockVisibility(mode) },
+        paint: {
+          "line-color": "#000000",
+          "line-width": ["case", ["boolean", ["feature-state", "selected"], false], 3, 0],
+        },
+      },
+      firstSymbol,
+    ],
   ];
   for (const [layer, before] of layers) map.addLayer(layer, before);
 }
@@ -177,14 +204,17 @@ export function MapView(props: Props) {
   const mapRef = useRef<MLMap | null>(null);
   const hovered = useRef<string | null>(null);
   const selected = useRef<string | null>(null);
-  const handlers = useRef(props); // latest callbacks without re-binding map events
+  const selectedBlock = useRef<string | null>(null);
+  const handlers = useRef(props); // latest props without re-binding map events
   handlers.current = props;
   const [loaded, setLoaded] = useState(false);
+  const [zoom, setZoom] = useState(0);
 
   // Create once (per region: the parent keys this component by region id).
   useEffect(() => {
     if (!container.current) return;
     const { bbox } = props.region;
+    const box: Bounds = [bbox.west, bbox.south, bbox.east, bbox.north];
     const map = new maplibregl.Map({
       container: container.current,
       style: props.basemapStyle,
@@ -193,6 +223,7 @@ export function MapView(props: Props) {
         [bbox.east, bbox.north],
       ],
       fitBoundsOptions: { padding: 24 },
+      maxBounds: expandBounds(box, MAX_PAN_KM), // the region and its surroundings, not the world
     });
     mapRef.current = map;
     // Dev only: lets the browser check (and you, in the console) inspect the live map.
@@ -200,9 +231,11 @@ export function MapView(props: Props) {
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
     map.on("load", () => {
-      addDataLayers(map, props.region, props.blockClasses);
+      addDataLayers(map, props.region, props.blockClasses, handlers.current.mode);
       setLoaded(true);
     });
+    setZoom(map.getZoom());
+    map.on("zoomend", () => setZoom(map.getZoom()));
     map.on("error", (e) => {
       const msg = e.error?.message ?? "map error";
       handlers.current.onError(msg);
@@ -229,9 +262,10 @@ export function MapView(props: Props) {
     });
     map.on("click", (e) => {
       const hits = map.queryRenderedFeatures(e.point, { layers: ["areas-fill"] });
-      const blocks = map.getLayer("blocks-fill")
-        ? map.queryRenderedFeatures(e.point, { layers: ["blocks-fill"] })
-        : [];
+      const blocks =
+        handlers.current.mode === "blocks" && map.getLayer("blocks-fill")
+          ? map.queryRenderedFeatures(e.point, { layers: ["blocks-fill"] })
+          : [];
       // A point can lie in several overlapping areas: report all, once each.
       const seen = new Set<string>();
       const areas = hits.map(toArea).filter((a) => !seen.has(a.area_id) && seen.add(a.area_id));
@@ -246,6 +280,17 @@ export function MapView(props: Props) {
     };
   }, []);
 
+  // View mode: area fill and block layers; entering the blocks view zooms in if needed.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!loaded || !map) return;
+    map.setPaintProperty("areas-fill", "fill-opacity", areaOpacity(props.mode));
+    for (const id of ["blocks-fill", "blocks-selected"])
+      map.setLayoutProperty(id, "visibility", blockVisibility(props.mode));
+    if (props.mode === "blocks" && map.getZoom() < BLOCK_MIN_ZOOM)
+      map.easeTo({ zoom: BLOCK_MIN_ZOOM, duration: 600 });
+  }, [loaded, props.mode]);
+
   // New area data (threshold or area type changed): swap it in place.
   useEffect(() => {
     const map = mapRef.current;
@@ -253,7 +298,7 @@ export function MapView(props: Props) {
     (map.getSource(AREAS) as GeoJSONSource).setData((props.areas ?? EMPTY) as never);
   }, [loaded, props.areas]);
 
-  // Selection outline (feature state survives setData because ids are promoted).
+  // Area selection outline (feature state survives setData because ids are promoted).
   useEffect(() => {
     const map = mapRef.current;
     if (!loaded || !map) return;
@@ -263,6 +308,18 @@ export function MapView(props: Props) {
       map.setFeatureState({ source: AREAS, id: props.selectedArea }, { selected: true });
     selected.current = props.selectedArea;
   }, [loaded, props.selectedArea, props.areas]);
+
+  // Block selection outline.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!loaded || !map) return;
+    const at = (id: string) => ({ source: BLOCKS, sourceLayer: "blocks", id });
+    if (selectedBlock.current !== null)
+      map.setFeatureState(at(selectedBlock.current), { selected: false });
+    if (props.selectedBlock !== null)
+      map.setFeatureState(at(props.selectedBlock), { selected: true });
+    selectedBlock.current = props.selectedBlock;
+  }, [loaded, props.selectedBlock]);
 
   // Fly to a requested area (from search or URL).
   useEffect(() => {
@@ -278,5 +335,21 @@ export function MapView(props: Props) {
     );
   }, [props.focus]);
 
-  return <div ref={container} className="map" data-testid="map" />;
+  const needZoom = props.mode === "blocks" && loaded && zoom < BLOCK_MIN_ZOOM - 0.01;
+  return (
+    <div className="map-wrap">
+      <div ref={container} className="map" data-testid="map" />
+      {needZoom ? (
+        <div className="map-hint" role="status">
+          Zoom in to see each block's walk to a park.{" "}
+          <button
+            type="button"
+            onClick={() => mapRef.current?.easeTo({ zoom: BLOCK_MIN_ZOOM, duration: 600 })}
+          >
+            Zoom in
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
 }
