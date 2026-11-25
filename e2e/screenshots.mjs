@@ -42,12 +42,6 @@ const shots = [
     scheme: "light",
     mobile: true,
   },
-  {
-    path: "/about",
-    size: PHONE,
-    scheme: "dark",
-    mobile: true,
-  },
 ];
 
 const browser = await chromium.launch({

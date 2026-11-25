@@ -51,8 +51,25 @@ async function openApp(page: Page, path = "") {
 test("the map loads with the region's data", async ({ page }) => {
   await openApp(page);
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
+  await expect(page.getByTestId("map")).toHaveAttribute("data-loaded", "true");
   await expect(page.getByRole("combobox")).toBeVisible(); // area search, filled from the API
   await expect(page.locator("body")).toContainText(/within a 10-minute walk/i);
+});
+
+test("the data still draws when the street map is blocked", async ({
+  page,
+}) => {
+  // As with an ad blocker or a filtering network (a real report from a visitor).
+  await page.unroute("https://tiles.openfreemap.org/**");
+  await page.route("https://tiles.openfreemap.org/**", (route) =>
+    route.abort("blockedbyclient"),
+  );
+  await openApp(page);
+  await expect(page.getByTestId("map")).toHaveAttribute("data-loaded", "true");
+  await expect(page.getByRole("status")).toContainText(
+    "The street map couldn't load",
+  );
+  await expect(page.getByRole("alert")).toHaveCount(0); // a degraded view, not an error
 });
 
 test("Rankings shows four titled lists, and a deep link works", async ({

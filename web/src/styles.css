@@ -409,6 +409,12 @@ button.link {
   border: 1px solid var(--line);
   border-radius: 999px;
   box-shadow: var(--shadow);
+  max-width: min(560px, calc(100% - 120px)); /* clear of the zoom buttons */
+}
+.map-notice {
+  border-radius: 12px;
+  color: var(--ink-2);
+  font-size: 13px;
 }
 
 /* MapLibre's controls, in the page's colors (both themes). */
@@ -427,6 +433,9 @@ button.link {
 .maplibregl-ctrl-attrib {
   background: var(--raised) !important;
   color: var(--muted);
+}
+.maplibregl-ctrl-attrib-inner {
+  color: var(--muted); /* MapLibre's default near-black vanished on the dark theme */
 }
 .maplibregl-ctrl-attrib a {
   color: var(--ink-2) !important;

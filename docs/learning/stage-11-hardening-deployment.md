@@ -344,3 +344,7 @@ All eight as recommended (D-026).
 - **`/health` doesn't report the run id** (§9 said it would). It reports the schema version; the run id is in `/api/v1/regions/{id}`. No new field for a check that already exists.
 - **The run id isn't stable across commits** (see §13), so reproduction is judged on checksums and figures.
 - **Added:** the phone-width overflow fix and its tests, a PostGIS version line in `db status`, `render.yaml`, the `TOUCHGRASS_POOL_*` and `TOUCHGRASS_SESSION_OPTIONS` settings, and `py.typed` for the API package.
+- **After launch (D-026 amendment 1):**
+  - **The basemap is a dependency the app didn't survive losing.** One visitor's browser couldn't reach OpenFreeMap (a blocker or filtering network) and saw a blank map, although our data and API were fine. The map now falls back to a plain background and still draws the data.
+  - **The dark basemap's mid-grey labels nearly vanished over the data colors;** labels now use the page's ink with a strong halo.
+  - **Lesson:** every third-party request is a way to fail. Decide what the page shows without it.

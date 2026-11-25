@@ -615,3 +615,28 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 - **Created** `docs/PORTFOLIO.md`: descriptions, architecture, stack rationale, data flow, challenges, trade-offs, screenshots to capture, validation, lessons learned, future work, resume bullets, an interview walkthrough and 22 interview questions.
 - **Checked:** every figure against the database, run records, `reference.json` or this log. Where older notes disagree with today's data (park access points: 11,878 in an early Stage 5 run, 15,601 in the current network report), today's figure is used.
 - **Kept local:** you git-ignored `docs/PORTFOLIO.md`, so the README doesn't link it.
+
+## 2026-11-25 — After launch: basemap fallback, label contrast (D-026 amendment 1)
+
+**Reports:**
+- A visitor in Houston saw `AJAXError: Failed to fetch (0)` for both OpenFreeMap styles.
+- Dark-mode place names were hard to read.
+
+**Diagnosis:**
+- OpenFreeMap answered normally (200, ~0.1 s, `access-control-allow-origin: *`), and a visitor in Vietnam loaded it, so the request was stopped on the visitor's side (blocker, DNS filter or network).
+- Reproduced on the live site by blocking the host in Playwright: the map stayed blank, because data layers were added only after the basemap loaded.
+- The dark style's labels are `rgb(101,101,101)` with a thin halo.
+
+**Fix:**
+- `fallbackBasemap()` and a one-time switch on a pre-load error, with a neutral notice;
+- `LABEL_STYLE` applied to every basemap text layer;
+- the credits text color;
+- `data-loaded` on the map container, for tests.
+
+**Tests:**
+- **Web:** 54 (+2: label contrast ≥ 7:1, fallback style valid and network-free).
+- **Browser:** 9 (+1: OpenFreeMap blocked, the data still draws, a status notice and no alert). The new test fails against the old live site and passes on the fix.
+
+**Also fixed:** `e2e/screenshots.mjs` had a nameless entry left from an earlier edit, which wrote `undefined.png`. README screenshots retaken.
+
+**Not verified:** the deployed fix (needs a push), and the visitor's own browser.

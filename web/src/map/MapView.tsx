@@ -33,6 +33,8 @@ import { type Bounds, expandBounds, MAX_PAN_KM } from "./bounds";
 import {
   type BlockClass,
   blockColorExpression,
+  fallbackBasemap,
+  LABEL_STYLE,
   LINE_STYLE,
   PARK_STYLE,
   shareColorExpression,
@@ -110,6 +112,22 @@ function setBuildingEmphasis(map: MLMap, mode: Mode): void {
     map.setPaintProperty(layer.id, "fill-opacity", mode === "residents" ? 0.12 : 1);
   }
 }
+
+/** Basemap labels in our ink with a strong halo, so they read over the colored fills. */
+function styleLabels(map: MLMap, theme: Theme): void {
+  const s = LABEL_STYLE[theme];
+  for (const layer of map.getStyle().layers) {
+    if (layer.type !== "symbol" || !map.getLayoutProperty(layer.id, "text-field")) continue;
+    map.setPaintProperty(layer.id, "text-color", s.color);
+    map.setPaintProperty(layer.id, "text-halo-color", s.halo);
+    map.setPaintProperty(layer.id, "text-halo-width", s.haloWidth);
+    map.setPaintProperty(layer.id, "text-halo-blur", s.haloBlur);
+  }
+}
+
+export const BASEMAP_UNAVAILABLE =
+  "The street map couldn't load: a blocker or your network may be stopping " +
+  "tiles.openfreemap.org. Showing the data without streets.";
 
 /** Areas are opaque in the residents view; in the blocks view transparent but clickable. */
 const areaOpacity = (mode: Mode) => (mode === "residents" ? 1 : 0);
@@ -279,7 +297,13 @@ export function MapView(props: Props) {
     if (import.meta.env.DEV) (window as unknown as { __map?: MLMap }).__map = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
+    // If the basemap can't be fetched (blocked host, network), "load" never fires and the
+    // map stays blank. Fall back once to a plain background so the data still draws.
+    let ready = false;
+    let fellBack = false;
     map.on("load", () => {
+      ready = true;
+      styleLabels(map, props.theme);
       addDataLayers(map, props.region, props.blockClasses, handlers.current.mode, props.theme);
       setBuildingEmphasis(map, handlers.current.mode);
       setLoaded(true);
@@ -291,6 +315,13 @@ export function MapView(props: Props) {
       handlers.current.onMoveEnd({ center: [c.lng, c.lat], zoom: map.getZoom() });
     });
     map.on("error", (e) => {
+      if (!ready && !fellBack) {
+        // Before the first load, only the basemap is being fetched (our sources come later).
+        fellBack = true;
+        map.setStyle(fallbackBasemap(props.theme));
+        handlers.current.onError(BASEMAP_UNAVAILABLE);
+        return;
+      }
       const msg = e.error?.message ?? "map error";
       handlers.current.onError(msg);
     });
@@ -393,7 +424,7 @@ export function MapView(props: Props) {
   const needZoom = props.mode === "blocks" && loaded && zoom < BLOCK_MIN_ZOOM - 0.01;
   return (
     <div className="map-wrap">
-      <div ref={container} className="map" data-testid="map" />
+      <div ref={container} className="map" data-testid="map" data-loaded={loaded} />
       {needZoom ? (
         // Dims the map so "nothing drawn yet" is obvious, without blocking scroll-to-zoom: the
         // overlay ignores the pointer, only the card takes clicks.

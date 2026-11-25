@@ -1,4 +1,4 @@
-import { expression, latest } from "@maplibre/maplibre-gl-style-spec";
+import { expression, latest, validateStyleMin } from "@maplibre/maplibre-gl-style-spec";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,7 +6,10 @@ import {
   blockClassOf,
   blockColorExpression,
   blockLegend,
+  fallbackBasemap,
+  LABEL_STYLE,
   NO_DATA_COLOR,
+  PAGE_BG,
   NO_ROUTE_COLOR,
   SHARE_COLORS,
   shareClassIndex,
@@ -126,5 +129,42 @@ describe("share classes", () => {
       "85%–95% of residents",
       "95% or more of residents",
     ]);
+  });
+});
+
+/** WCAG relative luminance and contrast ratio for #rrggbb or rgba(r, g, b, a) colors. */
+function luminance(color: string): number {
+  const rgb = color.startsWith("#")
+    ? [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16))
+    : (color.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+  const [r, g, b] = rgb.map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+}
+const contrast = (a: string, b: string) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi! + 0.05) / (lo! + 0.05);
+};
+
+describe("map labels and the fallback basemap", () => {
+  it("labels contrast strongly with their halo in both themes", () => {
+    for (const theme of ["light", "dark"] as const) {
+      const s = LABEL_STYLE[theme];
+      expect(contrast(s.color, s.halo)).toBeGreaterThanOrEqual(7); // WCAG AAA for text
+      expect(s.haloWidth).toBeGreaterThanOrEqual(1.5);
+    }
+  });
+
+  it("the fallback basemap is a valid style that needs no network", () => {
+    for (const theme of ["light", "dark"] as const) {
+      const style = fallbackBasemap(theme);
+      expect(validateStyleMin(style)).toEqual([]);
+      expect(style.sources).toEqual({});
+      expect(style.glyphs).toBeUndefined(); // no fonts to fetch
+      expect(style.sprite).toBeUndefined();
+      expect(style.layers[0]).toMatchObject({ paint: { "background-color": PAGE_BG[theme] } });
+    }
   });
 });

@@ -24,7 +24,13 @@ import { AreaTypeToggle, ModeToggle, SearchBox, ThresholdToggle } from "./compon
 import { Legend } from "./components/Legend";
 import { type Selection, SidePanel } from "./components/SidePanel";
 import { typeLabel } from "./format";
-import { type Bounds, type Camera, type MapClick, MapView } from "./map/MapView";
+import {
+  BASEMAP_UNAVAILABLE,
+  type Bounds,
+  type Camera,
+  type MapClick,
+  MapView,
+} from "./map/MapView";
 import { blockClasses, blockLegend, PARK_COLOR, shareLegend, type Theme } from "./map/style";
 import {
   formatView,
@@ -482,7 +488,11 @@ export function App() {
         <Legend title="" items={[{ color: PARK_COLOR, label: "Park or natural area" }]} />
       </details>
       {mapError ? (
-        <p className="error map-error" role="alert">
+        // A missing street map is a degraded view, not a failure: say so without alarm.
+        <p
+          className={mapError === BASEMAP_UNAVAILABLE ? "map-error map-notice" : "error map-error"}
+          role={mapError === BASEMAP_UNAVAILABLE ? "status" : "alert"}
+        >
           {mapError}{" "}
           <button type="button" className="link" onClick={() => setMapError(null)}>
             dismiss

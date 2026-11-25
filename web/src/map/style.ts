@@ -12,7 +12,7 @@
  * green is the pair colorblind readers most often confuse (D-024 amendment 2).
  */
 
-import type { ExpressionSpecification } from "maplibre-gl";
+import type { ExpressionSpecification, StyleSpecification } from "maplibre-gl";
 
 export type LegendItem = { color: string; label: string };
 export type Threshold = { minutes: number; meters: number };
@@ -37,6 +37,37 @@ export const LINE_STYLE: Record<Theme, { area: string; highlight: string }> = {
   light: { area: "#4a524c", highlight: "#111511" },
   dark: { area: "#b8c2bb", highlight: "#ffffff" },
 };
+
+/**
+ * Basemap labels over our colored fills. The basemaps' own label colors are tuned for their
+ * plain backgrounds: the dark style's mid-grey (rgb 101,101,101) nearly vanished over the
+ * share colors. Near-ink text with a strong page-colored halo reads over any fill.
+ */
+export const LABEL_STYLE: Record<
+  Theme,
+  { color: string; halo: string; haloWidth: number; haloBlur: number }
+> = {
+  light: { color: "#2b302c", halo: "rgba(255, 255, 255, 0.92)", haloWidth: 1.6, haloBlur: 0.4 },
+  dark: { color: "#f2f5f3", halo: "rgba(14, 18, 16, 0.92)", haloWidth: 1.6, haloBlur: 0.4 },
+};
+
+/** Page background per theme (the CSS --bg token), for the fallback basemap. */
+export const PAGE_BG: Record<Theme, string> = { light: "#ffffff", dark: "#0e1210" };
+
+/**
+ * A plain basemap for when the real one can't load (a blocker or a network that stops
+ * tiles.openfreemap.org). Our own layers need no fonts or sprites, so they draw on it.
+ */
+export function fallbackBasemap(theme: Theme): StyleSpecification {
+  return {
+    version: 8,
+    name: "touchgrass-fallback",
+    sources: {},
+    layers: [
+      { id: "background", type: "background", paint: { "background-color": PAGE_BG[theme] } },
+    ],
+  };
+}
 
 /**
  * RdYlBu without its pale middle, 5 classes: the lowest shares get the strongest warm color, so
