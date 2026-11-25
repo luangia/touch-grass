@@ -1,6 +1,6 @@
 # Stage 10: Comparison, Underserved View, Methodology and Polish
 
-> Status: **implemented 2026-11-24, awaiting your review.** §13 is what was built, §14 the results and browser check, §15 the answers to §12, and §16 where the build departed from the plan.
+> Status: **complete 2026-11-24** (approved and committed as `698066d`). §13 is what was built, §14 the results and browser check, §15 the answers to §12, and §16 where the build departed from the plan.
 > Numbers marked **(prototype 2026-11-23)** come from throwaway SQL against the loaded dev database (run `7c1fc6efaf00effa`) in the scratch area. No project code was changed.
 
 ## 1. Objective and expected outcome

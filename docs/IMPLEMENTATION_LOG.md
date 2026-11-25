@@ -565,3 +565,10 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 
 **Not verified:** a desktop-width browser check (the pane stayed at 700 px); a real phone. Nothing committed. The metrics record shows uncommitted code until committed and rerun.
 
+**Stage 10:** committed as `698066d` ("Commit and /learn:advance"). Verified on the commit: pipeline 247, API 39, web 45 + 2 skipped (the live-API contract test); tsc clean. The metrics rerun on the clean commit was stopped at your request; the Stage 11 fresh-clone rehearsal recomputes metrics from committed code instead.
+
+## 2026-11-24 — Stage 11 prepared
+
+**Checked:** database 99 MB; raw data 595 MB; 4 live ArcGIS sources (City ×3, Metro ORCA) whose bytes can change; `pageFromPath` assumes the site root, so it breaks under GitHub Pages' `/touch-grass/`; the API sets its read-only and timeout safeguards through startup `options`, which some poolers reject. Hosting facts (Neon Free 1 GB with PostGIS; Render free spins down after 15 min) from the providers' docs, lesson §15.
+
+**Created:** `docs/learning/stage-11-hardening-deployment.md` (Q1–Q8 pending; account, secret and push steps listed in §11 as yours).

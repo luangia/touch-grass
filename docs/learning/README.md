@@ -13,7 +13,8 @@ Detailed, stage-by-stage technical lessons.
 | 7 | [Neighborhood aggregation & underserved metrics](stage-07-neighborhood-metrics.md) — population weighting, share vs count, overlaps, MAUP, ACS allocation and MOE propagation, reliability, context not cause, priority | Complete |
 | 8 | [FastAPI backend](stage-08-fastapi-backend.md) — REST resources, dependency injection, connection pools, GeoJSON (RFC 7946) and simplification, vector tiles (z/x/y, `ST_AsMVT`), SQL injection and identifiers, caching, CORS | Complete |
 | 9 | [Interactive map](stage-09-interactive-map.md) — WebGL maps, sources vs layers, data-driven styling, feature state, classification and colorblind-safe color, React + an imperative map, typed API client, URL state, accessibility | Complete |
-| 10 | [Comparison, underserved view, methodology](stage-10-comparison-and-polish.md) — question-first views, honest rankings, straight line vs network, demographic context without causal claims, resident-based disparity with MOE, small SVG charts, licences as data | Implemented, awaiting review |
+| 10 | [Comparison, underserved view, methodology](stage-10-comparison-and-polish.md) — question-first views, honest rankings, straight line vs network, demographic context without causal claims, resident-based disparity with MOE, small SVG charts, licences as data | Complete |
+| 11 | [Testing hardening, deployment & portfolio](stage-11-hardening-deployment.md) — CI with service containers, stateful vs static deployment, free-tier cold starts, connection poolers, two tiers of reproducibility, SPAs on static hosts, read-only API safeguards, browser smoke tests | Prepared, awaiting approval |
 
 ## Deep dives
 
