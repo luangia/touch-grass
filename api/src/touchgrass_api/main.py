@@ -25,7 +25,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        pool = make_pool(cfg.conninfo, cfg.pool_min, cfg.pool_max)
+        pool = make_pool(
+            cfg.conninfo, cfg.pool_min, cfg.pool_max, session_options=cfg.session_options
+        )
         pool.open(wait=True, timeout=10)
         try:
             with pool.connection() as conn:

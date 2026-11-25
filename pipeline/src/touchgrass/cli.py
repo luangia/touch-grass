@@ -13,6 +13,7 @@ Stage 2 commands:
 Stage 4 commands (PostGIS; settings from $DATABASE_URL or the repo's .env):
   touchgrass db migrate                        create/upgrade the schema
   touchgrass db status                         migrations + row counts per region
+  touchgrass db create-reader                  the API's SELECT-only role (Stage 11)
   touchgrass load <region-id>                  replace a region's rows, one transaction
 
 Stage 5 commands:
@@ -20,10 +21,17 @@ Stage 5 commands:
 
 Stage 6 commands:
   touchgrass analyze <region-id>               walking distance from every block to a park
+
+Stage 7 commands:
+  touchgrass metrics <region-id>               area metrics, ACS context, report
+
+Stage 11 commands:
+  touchgrass reference <region-id> [--write]   compare with results/<id>/reference.json
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Annotated
 
@@ -37,6 +45,7 @@ from touchgrass.db import migrate as dbmigrate
 from touchgrass.db.load import LoadError, row_counts
 from touchgrass.db.load import load_region as db_load_region
 from touchgrass.paths import RegionPaths, resolve_data_dir
+from touchgrass.pipeline import reference as ref
 from touchgrass.pipeline.analyze import run_analysis
 from touchgrass.pipeline.fetch import run_fetch
 from touchgrass.pipeline.metrics import METRICS_FILES, run_metrics
@@ -262,11 +271,32 @@ def db_migrate_cmd() -> None:
     typer.echo("schema is up to date" if not applied else f"{len(applied)} migration(s) applied")
 
 
+@db_app.command("create-reader")
+def db_create_reader_cmd(
+    role: Annotated[str, typer.Option(help="Role name for the API.")] = "touchgrass_reader",
+) -> None:
+    """Create or update the API's SELECT-only login role (asks for its password)."""
+    from touchgrass.db.roles import ensure_reader
+
+    password = typer.prompt(f"password for {role}", hide_input=True, confirmation_prompt=True)
+    with _db_connect() as conn:
+        created = ensure_reader(conn, role, password)
+    typer.secho(
+        f"✓ {'created' if created else 'updated'} {role}: SELECT only, read-only", fg="green"
+    )
+
+
 @db_app.command("status")
 def db_status_cmd() -> None:
     """Show applied/pending migrations and row counts per loaded region."""
     with _db_connect() as conn:
         typer.echo(f"database: {dbconn.load_settings().describe()}")
+        row = conn.execute(
+            "SELECT current_setting('server_version'), "
+            "(SELECT extversion FROM pg_extension WHERE extname = 'postgis')"
+        ).fetchone()
+        if row:
+            typer.echo(f"server:   PostgreSQL {row[0]}, PostGIS {row[1] or 'not installed'}")
         try:
             states = dbmigrate.status(conn)
         except dbmigrate.MigrationError as err:
@@ -399,3 +429,51 @@ def metrics_cmd(
     assert result.run_dir is not None
     typer.echo(f"report: {result.run_dir / METRICS_FILES['report']}\n")
     _print_checks(result.checks, result.run_dir / METRICS_FILES["validation"])
+
+
+# ----------------------------------------------------------------- Stage 11: reference
+
+
+@app.command("reference")
+def reference_cmd(
+    region: Annotated[str, typer.Argument(help="Region id.")],
+    write: Annotated[
+        bool, typer.Option("--write", help="Write the latest run as the new reference.")
+    ] = False,
+    config_dir: ConfigDirOption = None,
+    data_dir: DataDirOption = None,
+) -> None:
+    """Compare the latest run with the committed reference (exit 1 if unexplained)."""
+    _, paths = _region_and_paths(region, config_dir, data_dir)
+    repo = (config_dir or find_config_dir()).parent
+    try:
+        current = ref.build_reference(paths)
+    except MissingDataError as err:
+        typer.secho(f"✗ {err}", fg="red", err=True)
+        raise typer.Exit(code=1) from err
+    target = ref.reference_path(repo, region)
+    if write:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(ref.dump(current), "utf-8")
+        typer.secho(f"✓ wrote {target}", fg="green")
+        return
+    if not target.is_file():
+        typer.secho(f"✗ no reference at {target}: run with --write first", fg="red", err=True)
+        raise typer.Exit(code=1)
+    c = ref.compare(json.loads(target.read_text("utf-8")), current)
+    if c.run_note:
+        typer.echo(f"note: {c.run_note}")
+    if c.reproduced:
+        typer.secho("✓ reproduced: every source checksum and headline figure matches", fg="green")
+        return
+    for s in c.changed_sources:
+        typer.echo(f"  source {s}")
+    for f in c.changed_figures:
+        typer.echo(f"  figure {f}")
+    if c.unexplained:
+        typer.secho("✗ figures changed although every source matches: not reproduced", fg="red")
+        raise typer.Exit(code=1)
+    typer.secho(
+        "! figures differ, explained by the changed sources above (live layers can be edited)",
+        fg="yellow",
+    )

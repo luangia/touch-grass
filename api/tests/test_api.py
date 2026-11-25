@@ -285,3 +285,56 @@ def test_block_tiles_carry_straight_line_distance(client: TestClient, seeded: Se
     layer = mapbox_vector_tile.decode(client.get(url(f"/tiles/blocks/12/{x}/{y}.pbf")).content)
     props = [f["properties"] for f in layer["blocks"]["features"]]
     assert all(p["straight_m"] <= p["network_m"] + 30 for p in props)  # D-021 slack
+
+
+# ------------------------------------------------------------ Stage 11: production settings
+
+
+def test_production_settings_from_the_environment() -> None:
+    from touchgrass_api.settings import SettingsError, load_settings
+
+    s = load_settings(
+        {
+            "DATABASE_URL": "postgresql://reader@db.example.test/app?sslmode=require",
+            "TOUCHGRASS_CORS_ORIGINS": "https://example.test",
+            "TOUCHGRASS_POOL_MIN": "1",
+            "TOUCHGRASS_POOL_MAX": "3",
+            "TOUCHGRASS_SESSION_OPTIONS": "0",
+        }
+    )
+    assert (s.pool_min, s.pool_max, s.session_options) == (1, 3, False)
+    assert s.cors_origins == ("https://example.test",)
+    assert "sslmode=require" in s.conninfo
+    defaults = load_settings({"DATABASE_URL": "postgresql://u@h/d"})
+    assert (defaults.pool_min, defaults.pool_max, defaults.session_options) == (1, 8, True)
+    for bad in (
+        {"TOUCHGRASS_POOL_MAX": "x"},
+        {"TOUCHGRASS_POOL_MIN": "5", "TOUCHGRASS_POOL_MAX": "2"},
+    ):
+        with pytest.raises(SettingsError):
+            load_settings({"DATABASE_URL": "postgresql://u@h/d", **bad})
+
+
+def test_pool_without_session_options_relies_on_the_role(seeded: Seeded) -> None:
+    pool = db.make_pool(seeded.conninfo, 1, 1, session_options=False)
+    pool.open(wait=True, timeout=10)
+    try:
+        with pool.connection() as conn:
+            row = conn.execute("SHOW default_transaction_read_only").fetchone()
+            assert row is not None and row["default_transaction_read_only"] == "off"
+    finally:
+        pool.close()
+
+
+def test_server_errors_do_not_leak_internals(seeded: Seeded) -> None:
+    app = main.create_app(Settings(conninfo=seeded.conninfo))
+
+    @app.get("/boom")
+    def boom() -> None:
+        raise RuntimeError("SELECT secret FROM touchgrass.internal; password=hunter2")
+
+    with TestClient(app, raise_server_exceptions=False) as c:
+        r = c.get("/boom")
+    assert r.status_code == 500
+    assert r.text == "Internal Server Error"
+    assert "SELECT" not in r.text and "password" not in r.text

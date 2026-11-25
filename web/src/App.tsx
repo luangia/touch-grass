@@ -8,11 +8,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   api,
+  API_IS_LOCAL,
   ApiError,
   type AreaMetrics,
   type Methodology,
   type RegionDetail,
   type RegionSummary,
+  withWakeRetry,
 } from "./api/client";
 import { type AreaCollection, type AreaProperties, bboxOf } from "./api/geojson";
 import { AboutPage } from "./components/AboutPage";
@@ -64,6 +66,9 @@ function defaultAreaType(region: RegionDetail): string | null {
   return sorted[0]?.area_type ?? null;
 }
 
+/** How long the first load may take before the wake notice appears. */
+export const WAKE_NOTICE_AFTER_MS = 3000;
+
 export function App() {
   const [view, setView] = useState<ViewState>(() => parseView(window.location.search));
   const [page, setPage] = useState<Page>(() => pageFromPath(window.location.pathname));
@@ -80,6 +85,12 @@ export function App() {
   const [focus, setFocus] = useState<Bounds | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
+  // Still no region after a few seconds: probably a sleeping host waking up.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setSlow(true), WAKE_NOTICE_AFTER_MS);
+    return () => window.clearTimeout(t);
+  }, []);
 
   // URL ⇄ state. The history write happens in an effect, not in the state updater: updaters
   // must be pure (StrictMode runs them twice, which pushed every entry twice).
@@ -121,8 +132,12 @@ export function App() {
   // Regions → the chosen (or first) region's detail and methodology.
   useEffect(() => {
     const ctl = new AbortController();
-    api
-      .regions(ctl.signal)
+    // The first request may wake a sleeping host (D-026 Q1), so a deployed API is retried;
+    // a local one fails fast.
+    withWakeRetry(() => api.regions(ctl.signal), {
+      signal: ctl.signal,
+      attempts: API_IS_LOCAL ? 1 : 6,
+    })
       .then(setRegions)
       .catch((e: unknown) => ctl.signal.aborted || setFatal(message(e)));
     return () => ctl.abort();
@@ -270,12 +285,26 @@ export function App() {
       <main className="fatal">
         <h1>TouchGrass</h1>
         <p className="error">The map can't load: {fatal}</p>
-        <p>Is the API running? Start it with the command in the README.</p>
+        <p>
+          {API_IS_LOCAL
+            ? "Is the API running? Start it with the command in the README."
+            : "The server may be down or still waking up. Try again in a minute."}
+        </p>
       </main>
     );
   }
   if (!region || !areaType || threshold === null) {
-    return <main className="loading">Loading…</main>;
+    return (
+      <main className="loading">
+        <p>Loading…</p>
+        {slow ? (
+          <p className="wake-notice" role="status">
+            Waking the server: free hosting sleeps when idle, so the first visit can take up to a
+            minute.
+          </p>
+        ) : null}
+      </main>
+    );
   }
 
   const header = (

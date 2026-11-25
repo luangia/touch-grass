@@ -1,0 +1,110 @@
+{
+  "figures": {
+    "areas": {
+      "council_district": 4,
+      "neighborhood": 93
+    },
+    "median_detour_ratio": 1.353,
+    "median_walk_m_population_weighted": 447.1,
+    "population": 652503,
+    "ranked_areas": 91,
+    "resident_comparison": {
+      "people_of_color": {
+        "beyond": 0.385,
+        "clear": true,
+        "difference": 0.0519,
+        "difference_moe": 0.0131,
+        "within": 0.3331
+      },
+      "zero_vehicle_households": {
+        "beyond": 0.0983,
+        "clear": true,
+        "difference": -0.0447,
+        "difference_moe": 0.0122,
+        "within": 0.1431
+      }
+    },
+    "share_within": {
+      "10": {
+        "straight_line": 0.972,
+        "walking": 0.8502
+      },
+      "15": {
+        "straight_line": 0.9999,
+        "walking": 0.9751
+      },
+      "5": {
+        "straight_line": 0.6758,
+        "walking": 0.4372
+      }
+    },
+    "underserved_residents": 97753,
+    "unreachable_blocks": 1
+  },
+  "format": 1,
+  "region_id": "portland-or",
+  "runs": {
+    "analysis_commit": "d3fd91d9ce181447a187243dd7059bf4fca0b3b1",
+    "analysis_dirty": false,
+    "metrics_commit": "698066de32124664f9116622cd7ecebf2f794592",
+    "metrics_dirty": false,
+    "run_id": "7c1fc6efaf00effa"
+  },
+  "sources": {
+    "acs_b01003": {
+      "file": "acsdt5y2024-b01003.dat",
+      "kind": "dated",
+      "sha256": "18b472a64a118a51a62241eabc12691cc262a135f6fe84842a313b5e6a1484ef"
+    },
+    "acs_b03002": {
+      "file": "acsdt5y2024-b03002.dat",
+      "kind": "dated",
+      "sha256": "9a9971219fd9d416d15b4a5d72f557d6451b34056b67da8bc1ad4786ca485916"
+    },
+    "acs_b19013": {
+      "file": "acsdt5y2024-b19013.dat",
+      "kind": "dated",
+      "sha256": "d6cbd5132acbcfe1e3dbb018fa7caa3eca0cbf05870188c6b1590ec528ecf12d"
+    },
+    "acs_b25044": {
+      "file": "acsdt5y2024-b25044.dat",
+      "kind": "dated",
+      "sha256": "58cc12a00bb422040bc78c9db9a048e46ef11bb5adaa807b8b617a9a8afb2bb8"
+    },
+    "areas_council_district": {
+      "file": "areas_council_district.geojson",
+      "kind": "live",
+      "sha256": "e1f616a8296e6c0fc668cc4dc945bc7afcae78f512a4f868499653995a485d26"
+    },
+    "areas_neighborhood": {
+      "file": "areas_neighborhood.geojson",
+      "kind": "live",
+      "sha256": "3d2939c54b0327eeabca57e3faa8c5cdcc7b8bb3afa2c215d7f0d3feb26e8c8e"
+    },
+    "osm_extract": {
+      "file": "oregon-261101.osm.pbf",
+      "kind": "dated",
+      "sha256": "e8948c9e1f33db4287b9fe19f25b61cc11a87c654a6c718aed59bb5abbfdb41e"
+    },
+    "parks_validation": {
+      "file": "parks_validation.geojson",
+      "kind": "live",
+      "sha256": "c97e5302c716cc63d9454370aeb53a8619210e5df48e0f01f6e497854eb3bb82"
+    },
+    "study_boundary": {
+      "file": "study_boundary.geojson",
+      "kind": "live",
+      "sha256": "f78cc90d39ef3ef9cfd56b21e6be75fc7172c033c0f963e9fbb3a1d2354691a9"
+    },
+    "tiger_bg": {
+      "file": "tl_2020_41_bg.zip",
+      "kind": "dated",
+      "sha256": "48cf89b7dadf72b58fb7909b8029c7f58ffcae0b27c4f25244729a5e1cdef120"
+    },
+    "tiger_tabblock20": {
+      "file": "tl_2020_41_tabblock20.zip",
+      "kind": "dated",
+      "sha256": "2a057daf7185823ff5d5195c82f91a984a5d68c2fa4e785ff90f2dc111bad283"
+    }
+  }
+}

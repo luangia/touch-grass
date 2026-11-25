@@ -450,3 +450,37 @@ def test_every_loaded_source_carries_its_licence(db: Conn, tmp_path: Path) -> No
     assert rows and all(rows.values())
     assert rows["tiger_tabblock20"] == "Public domain (U.S. Government work)"
     assert rows["study_boundary"] == "Test licence"
+
+
+# ------------------------------------------------------------- Stage 11: reader role
+
+
+def test_reader_role_can_select_but_never_write(db: Conn, test_settings: DbSettings) -> None:
+    import secrets
+
+    from touchgrass.db.roles import ensure_reader
+
+    role = f"tg_reader_test_{secrets.token_hex(4)}"
+    password = secrets.token_urlsafe(16)
+    try:
+        assert ensure_reader(db, role, password, statement_timeout_ms=200) is True
+        assert ensure_reader(db, role, password, statement_timeout_ms=200) is False  # rerun-safe
+        reader = DbSettings(
+            psycopg.conninfo.make_conninfo(test_settings.conninfo, user=role, password=password)
+        )
+        with connect(reader, autocommit=True) as conn:
+            (n,) = conn.execute("SELECT count(*) FROM touchgrass.regions").fetchone() or (None,)
+            assert n == 0
+            (ro,) = conn.execute("SHOW default_transaction_read_only").fetchone() or ("",)
+            assert ro == "on"
+            # No privilege to write, even with read-only switched off for the session.
+            conn.execute("SET default_transaction_read_only = off")
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                conn.execute("DELETE FROM touchgrass.regions")
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                conn.execute("CREATE TABLE touchgrass.x (i int)")
+            with pytest.raises(psycopg.errors.QueryCanceled):
+                conn.execute("SELECT pg_sleep(1)")
+    finally:
+        db.execute(f'DROP OWNED BY "{role}"')
+        db.execute(f'DROP ROLE IF EXISTS "{role}"')

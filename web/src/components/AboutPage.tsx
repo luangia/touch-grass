@@ -106,24 +106,26 @@ export function AboutPage({ region, methodology, city, onOpenMap }: Props) {
               Distance as the crow flies flatters access: freeways, rivers, hills and dead-end
               streets make real walks longer. Share of residents within each walk:
             </p>
-            <table className="mini-table">
-              <thead>
-                <tr>
-                  <th scope="col">Walk time</th>
-                  <th scope="col">By walking route</th>
-                  <th scope="col">As the crow flies</th>
-                </tr>
-              </thead>
-              <tbody>
-                {city.thresholds.map((t) => (
-                  <tr key={t.threshold_min}>
-                    <th scope="row">{t.threshold_min} minutes</th>
-                    <td>{pct(t.pct_within, 1)}</td>
-                    <td>{pct(t.pct_within_straight ?? null, 1)}</td>
+            <div className="table-scroll">
+              <table className="mini-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Walk time</th>
+                    <th scope="col">By walking route</th>
+                    <th scope="col">As the crow flies</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {city.thresholds.map((t) => (
+                    <tr key={t.threshold_min}>
+                      <th scope="row">{t.threshold_min} minutes</th>
+                      <td>{pct(t.pct_within, 1)}</td>
+                      <td>{pct(t.pct_within_straight ?? null, 1)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <p className="note">
               The straight line runs to the nearest edge of a park, so it's a floor on any walk. The
               Rankings page lists the places where the gap is largest.
@@ -194,16 +196,18 @@ export function AboutPage({ region, methodology, city, onOpenMap }: Props) {
         {params.length ? (
           <>
             <h2>Parameters</h2>
-            <table className="mini-table">
-              <tbody>
-                {params.map(([label, value]) => (
-                  <tr key={label}>
-                    <th scope="row">{label}</th>
-                    <td>{value}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="table-scroll">
+              <table className="mini-table">
+                <tbody>
+                  {params.map(([label, value]) => (
+                    <tr key={label}>
+                      <th scope="row">{label}</th>
+                      <td>{value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <details className="raw-params">
               <summary>Every parameter, as recorded with the run</summary>
               <pre>

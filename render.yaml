@@ -1,0 +1,22 @@
+# Render Blueprint for the API (D-026 Q1). In Render: New → Blueprint → this repository.
+# Secrets are never stored here: DATABASE_URL is entered in Render's dashboard (sync: false).
+# Field reference: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: touchgrass-api
+    runtime: docker
+    plan: free
+    region: oregon # next to the database (Neon AWS us-west-2) and the city it describes
+    dockerContext: ./api
+    dockerfilePath: ./api/Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass # deploy main only after CI passes
+    envVars:
+      - key: DATABASE_URL # the touchgrass_reader role on Neon's direct endpoint, sslmode=require
+        sync: false
+      - key: TOUCHGRASS_CORS_ORIGINS
+        value: https://luangia.github.io
+      - key: TOUCHGRASS_POOL_MIN
+        value: "1"
+      - key: TOUCHGRASS_POOL_MAX
+        value: "3"

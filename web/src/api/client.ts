@@ -51,6 +51,36 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   return (await res.json()) as T;
 }
 
+/** Statuses a sleeping free-tier host can answer with while it wakes (D-026 Q1). */
+const TRANSIENT = new Set([0, 502, 503, 504]);
+
+/**
+ * Retry a request while the API host wakes up: a network failure or a 502/503/504 is tried
+ * again after `delayMs`, up to `attempts` times in all. Any other error is final.
+ */
+export async function withWakeRetry<T>(
+  request: () => Promise<T>,
+  {
+    attempts = 6,
+    delayMs = 5000,
+    signal,
+  }: { attempts?: number; delayMs?: number; signal?: AbortSignal } = {},
+): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await request();
+    } catch (err) {
+      const transient = err instanceof ApiError && TRANSIENT.has(err.status);
+      if (!transient || i >= attempts || signal?.aborted) throw err;
+      await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+      if (signal?.aborted) throw err;
+    }
+  }
+}
+
+/** True when the app talks to an API on this machine (a dev setup, not a deployment). */
+export const API_IS_LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(API_URL);
+
 const region = (id: string) => `/api/v1/regions/${encodeURIComponent(id)}`;
 
 export const api = {

@@ -60,11 +60,25 @@ export function formatView(view: ViewState): string {
 export type Page = "map" | "rankings" | "compare" | "about";
 export const PAGES: Page[] = ["map", "rankings", "compare", "about"];
 
-export function pageFromPath(pathname: string): Page {
-  const m = pathname.match(/^\/(rankings|compare|about)\/?$/);
+/**
+ * The path the app is served under: "/" locally, "/touch-grass/" on GitHub Pages (D-026 Q3).
+ * Vite sets BASE_URL from `base` in vite.config.ts; it always ends with "/".
+ */
+export const BASE: string = import.meta.env.BASE_URL ?? "/";
+
+function normalizeBase(base: string): string {
+  const b = base.startsWith("/") ? base : `/${base}`;
+  return b.endsWith("/") ? b : `${b}/`;
+}
+
+export function pageFromPath(pathname: string, base: string = BASE): Page {
+  const b = normalizeBase(base);
+  const path = `${pathname}/`.startsWith(b) ? `/${pathname.slice(b.length)}` : null;
+  const m = path?.match(/^\/(rankings|compare|about)\/?$/);
   return m ? (m[1] as Page) : "map";
 }
 
-export function pathFor(page: Page): string {
-  return page === "map" ? "/" : `/${page}`;
+export function pathFor(page: Page, base: string = BASE): string {
+  const b = normalizeBase(base);
+  return page === "map" ? b : `${b}${page}`;
 }

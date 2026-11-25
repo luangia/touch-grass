@@ -23,21 +23,33 @@ class SchemaMismatchError(RuntimeError):
     pass
 
 
-def make_pool(conninfo: str, min_size: int = 1, max_size: int = 8) -> ConnectionPool[Conn]:
-    """A pool of autocommit, read-only connections that return rows as dicts."""
+SESSION_OPTIONS = "-c default_transaction_read_only=on -c statement_timeout=10000"
+
+
+def make_pool(
+    conninfo: str, min_size: int = 1, max_size: int = 8, *, session_options: bool = True
+) -> ConnectionPool[Conn]:
+    """A pool of autocommit, read-only connections that return rows as dicts.
+
+    ``session_options`` sends the read-only and timeout settings at connect time. Turn it
+    off only behind a pooler that rejects startup options, with the settings on the role
+    instead (``touchgrass db create-reader``, D-026 Q7).
+    """
+    kwargs: dict[str, Any] = {
+        "autocommit": True,
+        "row_factory": dict_row,
+        "application_name": "touchgrass-api",
+    }
+    if session_options:
+        # Every transaction is read-only: a bug cannot write (D-023 Q8).
+        kwargs["options"] = SESSION_OPTIONS
     return ConnectionPool(
         conninfo,
         min_size=min_size,
         max_size=max_size,
         open=False,
         check=ConnectionPool.check_connection,  # drop connections the server closed
-        kwargs={
-            "autocommit": True,
-            "row_factory": dict_row,
-            "application_name": "touchgrass-api",
-            # Every transaction is read-only: a bug cannot write (D-023 Q8).
-            "options": "-c default_transaction_read_only=on -c statement_timeout=10000",
-        },
+        kwargs=kwargs,
     )
 
 

@@ -250,12 +250,13 @@ What varies per region and how it's absorbed:
 
 Non-US regions would need different population adapters; the core algorithms do not change.
 
-## 8. Deployment considerations
+## 8. Deployment and CI (Stage 11, D-026)
 
-- **Local (MVP):** `docker compose up db` (PostGIS only), API via `uvicorn`, frontend via `vite`. Pipeline run from CLI.
-- **Portfolio deployment (Stage 11, optional):** results are read-only, so a small managed Postgres with PostGIS (or a single VM running compose) + static frontend hosting is enough. Alternative "serverless" option: export results to static GeoJSON/PMTiles and host the frontend statically with no backend at all — worth considering if hosting cost matters.
-- **Reproducibility:** pinned dependencies (`uv.lock`, `package-lock.json`), data manifests with checksums, `analysis_runs.params` + git commit hash.
-- **Attribution:** OSM (ODbL) attribution on the map; Census is public domain; city/Metro layers per their terms.
+- **Local:** `docker compose up -d db` (PostGIS only), API via `uvicorn`, web app via `vite`. The pipeline runs from the CLI.
+- **Hosted, $0:** the web app as static files on **GitHub Pages** (`/touch-grass/`, with a `404.html` copy for deep links); the API as a Docker container on **Render free** (`render.yaml`, `api/Dockerfile`; sleeps when idle, so the web app retries and shows a wake notice); PostGIS on **Neon free**, loaded from a laptop with `touchgrass db migrate` + `load`. The API logs in as `touchgrass_reader` (SELECT only, read-only transactions and a statement timeout set on the role). Steps, redeploys and rollbacks: [DEPLOYMENT.md](DEPLOYMENT.md).
+- **CI (GitHub Actions):** pipeline, api and web jobs run the same lint, type and test commands as locally, with a PostGIS service container so the database tests run; an e2e job seeds the synthetic region and drives the built app in headless Chromium (Playwright), including at phone width; an audit job reports known vulnerabilities without failing the build. The `-m data` tests need the ~600 MB raw inputs and stay local.
+- **Reproducibility:** pinned dependencies (`uv.lock`, `package-lock.json`, and date cutoffs); data manifests with checksums; run records with parameters, input checksums and the git commit; and a committed `results/<region>/reference.json` that `touchgrass reference` compares a run against, naming any source whose bytes changed.
+- **Attribution:** OSM (ODbL) attribution on the map; Census is public domain; City and Metro layers per their terms; every source's licence is stored with the data and listed on the About page.
 
 ## 9. Data sources (evaluation)
 

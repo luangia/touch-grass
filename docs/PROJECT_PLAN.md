@@ -1,6 +1,6 @@
 # Project Plan — TouchGrass
 
-> Status: **Stages 1–10 complete (Stage 10 committed 2026-11-24 as `698066d`). Stage 11 prepared, awaiting approval** ([lesson](learning/stage-11-hardening-deployment.md) §12).
+> Status: **Stages 1–10 complete. Stage 11 implemented (2026-11-24), awaiting your review; deployment waits on your account steps** ([lesson](learning/stage-11-hardening-deployment.md) §13–16, [DEPLOYMENT.md](DEPLOYMENT.md)).
 > See [ARCHITECTURE.md](ARCHITECTURE.md) for design and [DECISIONS.md](DECISIONS.md) for the trade-offs behind it.
 
 ## 1. Problem

@@ -545,6 +545,17 @@ dd {
   color: var(--ink);
 }
 
+.wake-notice {
+  max-width: 34rem;
+  margin-top: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-2);
+}
+
 /* --------------------------------------------------------------------- about */
 
 .about-page {
@@ -616,13 +627,26 @@ dd {
 
 @media (max-width: 760px) {
   .app {
-    grid-template: auto auto 60vh auto / 1fr;
+    /* minmax(0, 1fr): a plain 1fr can't shrink below its widest content, which pushed the
+       whole page past the screen edge on phones. */
+    grid-template: auto auto 60vh auto / minmax(0, 1fr);
     grid-template-areas: "top" "tools" "map" "panel";
     height: auto;
   }
   .topbar {
-    gap: 12px;
-    padding: 10px 16px;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    padding: 10px 16px 0;
+  }
+  .topbar nav {
+    order: 3; /* its own row under the brand and the theme toggle */
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+    gap: 20px;
+  }
+  .theme-toggle {
+    margin-left: auto;
   }
   .brand-region {
     display: none; /* the about page and panel name the region */
@@ -666,6 +690,7 @@ dd {
 }
 .page {
   padding: 40px 20px 64px;
+  overflow-wrap: anywhere; /* long URLs in the sources list would widen phones */
 }
 .page article {
   max-width: 680px;

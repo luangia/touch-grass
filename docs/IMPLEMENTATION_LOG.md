@@ -572,3 +572,29 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 **Checked:** database 99 MB; raw data 595 MB; 4 live ArcGIS sources (City ×3, Metro ORCA) whose bytes can change; `pageFromPath` assumes the site root, so it breaks under GitHub Pages' `/touch-grass/`; the API sets its read-only and timeout safeguards through startup `options`, which some poolers reject. Hosting facts (Neon Free 1 GB with PostGIS; Render free spins down after 15 min) from the providers' docs, lesson §15.
 
 **Created:** `docs/learning/stage-11-hardening-deployment.md` (Q1–Q8 pending; account, secret and push steps listed in §11 as yours).
+
+## 2026-11-24 — Stage 11 implemented (approved "Approve as recommended", Q1–Q8)
+
+**Decisions:** D-026.
+
+**Built (lesson §13):**
+- **CI:** `ci.yml` with pipeline, api, web, e2e and audit jobs; PostGIS service.
+- **Pages:** `pages.yml`, inactive until `VITE_API_URL` is set.
+- **Reproducibility:** `touchgrass reference` and `results/portland-or/reference.json`.
+- **Database:** `touchgrass db create-reader`; `db status` shows the PostGIS version.
+- **API:** pool and session-option settings; Dockerfile; `render.yaml`.
+- **Web:** base-path routing, `404.html`, the wake retry and notice.
+- **Browser tests:** `e2e/` Playwright smoke tests; screenshots.
+- **Docs:** portfolio README, `DEPLOYMENT.md`, ARCHITECTURE §8.
+
+**Results (lesson §14):**
+- **Fresh-clone rehearsal:** reproduced. All 11 source checksums and every headline figure match, from a fresh download; 687 s from an empty folder to a loaded database.
+
+**Fixes found while building:**
+- Phones scrolled sideways on every page (a `1fr` grid column, then a long URL on About). Fixed, and now tested at 390 px.
+- The run id includes the commit, so reproduction is judged on checksums and figures.
+- uvicorn re-raises SIGTERM, which skipped cleanup; it moved to a Playwright teardown.
+
+**Tests:** pipeline 253, API 42, web 52, browser 8. Linters clean; no known vulnerabilities reported.
+
+**Not verified:** CI on GitHub; the deployment (needs your accounts); the live smoke test. Nothing committed.

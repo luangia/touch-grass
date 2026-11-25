@@ -8,6 +8,12 @@ the API does not import the pipeline:
 
 ``TOUCHGRASS_CORS_ORIGINS``: comma-separated browser origins allowed to call the API
 (default: the Vite dev server).
+
+``TOUCHGRASS_POOL_MIN`` / ``TOUCHGRASS_POOL_MAX``: connection pool size (default 1 / 8; a
+small free database wants fewer, D-026 Q2).
+
+``TOUCHGRASS_SESSION_OPTIONS``: ``0`` to stop sending the read-only and timeout settings at
+connect time, for a pooler that rejects them; the role must then carry them (D-026 Q7).
 """
 
 from __future__ import annotations
@@ -57,6 +63,7 @@ class Settings:
     pool_min: int = 1
     pool_max: int = 8
     cache_max_age_s: int = 300
+    session_options: bool = True
 
     def describe(self) -> str:
         d = pg_conninfo.conninfo_to_dict(self.conninfo)
@@ -65,15 +72,39 @@ class Settings:
         )
 
 
+def _int(env: Mapping[str, str], key: str, default: int) -> int:
+    raw = env.get(key)
+    if raw is None or raw == "":
+        return default
+    try:
+        value = int(raw)
+    except ValueError as err:
+        raise SettingsError(f"{key} must be an integer, got {raw!r}") from err
+    if value < 1:
+        raise SettingsError(f"{key} must be at least 1, got {value}")
+    return value
+
+
 def load_settings(environ: Mapping[str, str] | None = None, start: Path | None = None) -> Settings:
     env = os.environ if environ is None else environ
     origins = tuple(
         o.strip() for o in env.get("TOUCHGRASS_CORS_ORIGINS", ",".join(DEFAULT_CORS)).split(",")
     )
     origins = tuple(o for o in origins if o)
+    pool_min = _int(env, "TOUCHGRASS_POOL_MIN", 1)
+    pool_max = _int(env, "TOUCHGRASS_POOL_MAX", 8)
+    if pool_min > pool_max:
+        raise SettingsError(f"TOUCHGRASS_POOL_MIN ({pool_min}) exceeds TOUCHGRASS_POOL_MAX")
+    session_options = env.get("TOUCHGRASS_SESSION_OPTIONS", "1").strip().lower() not in {
+        "0",
+        "false",
+        "off",
+        "no",
+    }
     url = env.get("DATABASE_URL")
     if url:
-        return Settings(pg_conninfo.make_conninfo(url), origins)
+        conninfo = pg_conninfo.make_conninfo(url)
+        return Settings(conninfo, origins, pool_min, pool_max, session_options=session_options)
     file_values = _env_file((start or Path.cwd()).resolve())
     params = {"host": "localhost", "port": "5432"}
     for var, keyword in _KEYS.items():
@@ -83,4 +114,5 @@ def load_settings(environ: Mapping[str, str] | None = None, start: Path | None =
     missing = [k for k in ("user", "dbname") if k not in params]
     if missing:
         raise SettingsError(f"no database settings for {missing}: set DATABASE_URL or POSTGRES_*")
-    return Settings(pg_conninfo.make_conninfo(**params), origins)
+    conninfo = pg_conninfo.make_conninfo(**params)
+    return Settings(conninfo, origins, pool_min, pool_max, session_options=session_options)

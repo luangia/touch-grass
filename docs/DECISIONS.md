@@ -544,3 +544,20 @@ TouchGrass is a public portfolio project, so clipping, reprojecting or overlayin
 | Q6 | Compare 2–4 areas of any type: table + grouped bars across thresholds, context rows with reliability; URL `?areas=`. |
 | Q7 | Rankings: four titled lists (lowest share, most underserved residents, priority, largest barrier gap); the floor applies to rates; top 10 then "show all"; equal displayed values are shown as ties. |
 | Q8 | Licences are data: fixed per adapter (Census TIGER/ACS: public domain; OpenStreetMap: ODbL 1.0) and a required `license` on every configured source (name, optional URL). They're stored in `datasets` and served by `/methodology`. |
+
+---
+
+## D-026 — Hardening, deployment and portfolio
+
+**Status:** Accepted (2026-11-24, Stage 11 Q1–Q8, "Approve as recommended")
+
+| # | Choice |
+|---|---|
+| Q1 | $0 deployment: web on **GitHub Pages**, API as a Docker web service on **Render free** (sleeps when idle; the web app shows a wake notice), database on **Neon free** (PostGIS). You confirm the free terms on the providers' pricing pages before signing up. |
+| Q2 | Production data is loaded from your laptop (`touchgrass db migrate` + `load`) over Neon's **direct** endpoint with TLS; the API uses the direct endpoint with a small pool. Neon's PostGIS version is checked against our migrations and tile SQL first. |
+| Q3 | Pages built by an Actions workflow; Vite `base` set from `VITE_BASE`; the router strips the base path; `404.html` fallback for deep links; `VITE_API_URL` from a repository variable. |
+| Q4 | CI: pipeline, api and web jobs running the local commands, with a PostGIS service so db tests run; `-m data` stays local; uv and npm caches; audit job that reports only. |
+| Q5 | A Playwright smoke test (chromium) against the synthetic `testville-zz` region in CI; run once against the public URL after deploy. |
+| Q6 | A committed `results/<region>/reference.json` (source checksums, run ids, headline figures); `touchgrass reference` writes and compares it; a fresh-clone rehearsal. Raw data is not redistributed. |
+| Q7 | A SELECT-only `touchgrass_reader` role with read-only transactions and `statement_timeout` set on the role; production CORS allows only the Pages origin; secrets only in host and GitHub settings; no rate limiter. |
+| Q8 | Final README (results, screenshots, architecture diagram, live link, quickstart, licences, CI badge, credits) and `docs/DEPLOYMENT.md`. The longer write-up comes from `/learn:portfolio`. |

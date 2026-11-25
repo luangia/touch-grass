@@ -6,16 +6,16 @@ _Last updated: 2026-11-24_
 
 | Item | Status |
 |---|---|
-| Phase | **Stages 1–10 complete.** Stage 11 prepared, awaiting approval |
+| Phase | **Stages 1–10 complete. Stage 11 implemented (2026-11-24)**; deployment waits on your account steps |
 | Completed stages | 1 Foundations · 2 Boundaries & population · 3 Parks · 4 PostGIS · 5 Walk network · 6 Walking accessibility · 7 Neighborhood metrics · 8 API · 9 Interactive map (2026-11-23) · 10 Comparison, rankings, methodology (2026-11-24) |
-| Current stage | 11: Testing hardening, deployment and portfolio. [Lesson](learning/stage-11-hardening-deployment.md); decisions Q1–Q8 (§12) pending, to become D-026 |
-| Code | `pipeline/`: … + `touchgrass analyze`, `touchgrass metrics`; 247 tests. `api/`: FastAPI, 10 endpoints; 39 tests. `web/`: map, Rankings, Compare, About, light/dark; 47 tests (2 skip without a live API) |
-| Database | schema at migration 0009; portland-or loaded (3 analysis runs; latest `7c1fc6efaf00effa`). Metrics were computed before the Stage 10 commit, so their record shows uncommitted code; the Stage 11 fresh-clone rehearsal recomputes them |
-| Git | `main` at `698066d` (Stage 10), matching `origin/main`; repository public. Stage 11 prep docs uncommitted |
+| Current stage | 11: Testing hardening, deployment and portfolio. [Lesson](learning/stage-11-hardening-deployment.md) §13–16; decisions D-026. Your steps: [DEPLOYMENT.md](DEPLOYMENT.md) |
+| Code | `pipeline/`: … + `analyze`, `metrics`, `reference`, `db create-reader`; 253 tests. `api/`: FastAPI, 10 endpoints, Dockerfile; 42 tests. `web/`: map, Rankings, Compare, About, light/dark; 52 tests (2 skip without a live API). `e2e/`: 8 Playwright smoke tests. CI and Pages workflows written, not yet run on GitHub |
+| Database | schema at migration 0009; portland-or loaded (latest run `7c1fc6efaf00effa`; the loaded metrics record still shows Stage 10's uncommitted code, while the metrics files on disk are from the clean commit `698066d`). A fresh-clone rehearsal reproduced every figure (lesson §14) |
+| Git | `main` at `131d3f1` (Stage 11 planning). Stage 11 implementation uncommitted |
 
 ## Currently being worked on
 
-- Stage 11 prepared: CI, reproducibility reference, deployment, browser smoke test, portfolio README. Waiting on your approval of Q1–Q8.
+- Stage 11 implemented: CI, the results reference (reproduced from a fresh clone), the API container, the reader role, Pages routing, browser smoke tests, the phone-layout fix, the portfolio README. Waiting on your review, then your deployment steps.
 - ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
@@ -38,8 +38,9 @@ uv run pytest                            # -m data / -m db to select; db tests u
 
 ## Next steps
 
-1. Approve Stage 11 Q1–Q8 (lesson §12), especially Q1, where to deploy.
-2. Then implement; the account, secret and push steps are yours (lesson §11).
+1. Review Stage 11 (lesson §13–14, README, DEPLOYMENT.md); commit.
+2. Push; check CI goes green on GitHub.
+3. Your deployment steps (DEPLOYMENT.md): Neon, Render, Pages. Then I verify the live site and run the smoke tests against it.
 
 ## Blockers / risks being watched
 
@@ -62,7 +63,7 @@ Target bullets (pending implementation):
 - ☑ Designed a multi-region PostGIS schema with GiST-indexed spatial joins, measuring a ~60× speedup via `EXPLAIN ANALYZE`. _(Stage 4)_
 - ☑ Produced population-weighted 5/10/15-minute park-access metrics for 93 neighborhoods and 4 council districts, identifying 97,753 residents beyond a 10-minute walk, with ACS context carrying propagated margins of error and reliability labels. _(Stage 7)_
 - ☑ Delivered a typed FastAPI service (GeoJSON + PostGIS-generated vector tiles) and a React/MapLibre interactive map for neighborhood comparison. _(Stages 8–10)_
-- ☐ Architected configuration-driven region onboarding so new cities require only a YAML config and data sources. _(Stages 1–2)_
+- ☐ Architected configuration-driven region onboarding: the pipeline is driven by a per-region YAML config, verified by a synthetic second region in the test suite and a test that no code names Portland. _(Only Portland is built; don't claim more.)_
 
 Completed so far:
 - Project planning and architecture design.

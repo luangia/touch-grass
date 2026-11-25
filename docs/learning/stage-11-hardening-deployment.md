@@ -1,6 +1,6 @@
 # Stage 11: Testing Hardening, Deployment and Portfolio
 
-> Status: **prepared 2026-11-24, awaiting your approval of Q1–Q8 (§12).** No application code has been changed.
+> Status: **implemented 2026-11-24 (D-026); deployment waits on your account steps (§11).** §13 is what was built, §14 the results, §16 departures from the plan.
 > Hosting facts were checked on 2026-11-24 (sources in §15). Free tiers change often, so §12 Q1 asks for a final check on the providers' own pricing pages before any account is created.
 
 ## 1. Objective and expected outcome
@@ -281,3 +281,56 @@ I'll stop and ask at each of these. Nothing here happens without you.
 
 - Neon Free plan, 1 GB per project: [changelog 2026-10-02](https://neon.com/docs/changelog/2026-10-02), [free-plan limits](https://neon.com/faqs/free-plan-limits-and-quotas), [pricing](https://neon.com/pricing), [plans](https://neon.com/docs/introduction/limits). PostGIS is on all plans.
 - Render free web services: spin down after 15 minutes idle, about a minute to wake, 750 free instance hours a month, ephemeral filesystem ([Deploy for Free](https://render.com/docs/free), [FAQ](https://render.com/docs/faq), [Docker](https://render.com/hosting/docker)). Paid prices weren't confirmed on Render's own pricing page; check [render.com/pricing](https://render.com/pricing).
+
+## 13. What was built (2026-11-24)
+
+| Piece | What it does |
+|---|---|
+| **CI** (`.github/workflows/ci.yml`) | Jobs for pipeline, api and web run the same lint, type and test commands as locally, on push to `main` and on pull requests. PostGIS runs as a service container, so the `-m db` tests run. An **e2e** job runs the browser smoke tests; an **audit** job runs `pip-audit` and `npm audit --omit=dev` and reports only |
+| **Reference** (`touchgrass reference`, `pipeline/reference.py`) | Writes `results/<region>/reference.json`: every raw file's checksum, marked *dated* or *live*; the headline figures, rounded; the run id and the commits. Compares a run against it: *reproduced*, *explained* (names the changed sources) or *unexplained* (exit 1). No timestamps, so the file is byte-stable |
+| **Reader role** (`touchgrass db create-reader`, `db/roles.py`) | A `LOGIN` role with `SELECT` on the schema (and on future tables), `default_transaction_read_only` and `statement_timeout` set **on the role**. It prompts for the password, so it never appears in a command line or a file |
+| **`db status`** | Also prints the server's PostgreSQL and PostGIS versions, the first check against a new host |
+| **API** | `TOUCHGRASS_POOL_MIN` / `_MAX` and `TOUCHGRASS_SESSION_OPTIONS` from the environment (validated); `py.typed`; a `Dockerfile` (multi-stage, uv, non-root user, `$PORT`, health check) built and run against the local database; `render.yaml` |
+| **Web** | Routing honours Vite's `BASE_URL`; the build writes `404.html` for deep links on Pages; the first request is retried while a deployed host wakes (6 × 5 s; a local API fails fast) and a "Waking the server" notice appears after 3 s; the error text no longer tells a site visitor to start the API |
+| **Pages** (`.github/workflows/pages.yml`) | Builds with `VITE_BASE=/touch-grass/` and `VITE_API_URL` from a repository variable; does nothing until that variable exists |
+| **Browser smoke tests** (`e2e/`) | Playwright (Chromium) against the **built** app under `/touch-grass/`, a real API and the synthetic region (`serve.py`, seeded by the code the API tests use, now in `api/tests/seeding.py`). Desktop: map, Rankings (with a deep-link reload), Compare, About; phone width: no page scrolls sideways. Fails on any browser console error. A global teardown drops the throwaway database. The same tests run against the live site with `E2E_BASE_URL` |
+| **Screenshots** (`e2e/screenshots.mjs`) | Five README screenshots, both themes, desktop and phone |
+| **Docs** | Portfolio README (results, screenshots, diagram, quickstart, reproduction, licences, credits); `DEPLOYMENT.md`; ARCHITECTURE §8 |
+
+**Found while building:**
+- **Phones scrolled sideways.** The phone screenshot showed the header, theme toggle, search box and legend running off the right edge. The phone grid column was `1fr`, which can't shrink below its widest content, and the header row (brand, four links, toggle) was wider than 390 px. Fixed with `minmax(0, 1fr)` and the nav on its own row; then the About page still overflowed, from a long licence URL. Fixed with `overflow-wrap: anywhere` on pages. The smoke tests now check all four pages at 390 px, so it can't come back unnoticed. Stage 10's "not verified on a phone" was hiding exactly this.
+- **The run id hashes the commit.** The lesson (§5.3) said the same downloads give the same run id. They don't across commits: the run id includes the code version (D-021), so any later commit gives a new id even when every number matches. The reference therefore compares **checksums and figures**, and treats a different run id as a note, not a failure.
+- **uvicorn swallows cleanup.** After SIGTERM, uvicorn shuts down and then re-raises the signal, so a `finally` block never runs; the e2e database was left behind. Cleanup moved to Playwright's global teardown.
+- **A `<datalist>` can't be driven by keyboard in headless Chromium.** The Compare test types an area's exact name instead, which is also how the search box selects.
+- **The interrupted rerun had finished half its work.** The `metrics` rerun you stopped after the Stage 10 commit had already written clean-commit metrics files (commit `698066d`, not dirty); the `load` after it never ran. The reference was written from those files.
+
+## 14. Results (2026-11-24)
+
+**Fresh-clone rehearsal.** In an empty folder: `git clone`, the uncommitted Stage 11 files laid on top, the README's commands in order. It used its own `touchgrass_rehearsal` database and a fresh download of every source.
+
+| Step | Finished at |
+|---|---|
+| `fetch` (fresh, ~480 MB) | 35 s → 441 s |
+| `process` | 497 s |
+| `db migrate` (0001–0009) | 500 s |
+| `network` | 654 s |
+| `analyze`, `metrics` | 672 s |
+| `reference` | **reproduced**: all 11 source checksums match (the 4 live ArcGIS layers are unchanged since the original fetch), and every headline figure matches. The run id differs (`ae844bf8901e35b0` vs `7c1fc6efaf00effa`), as expected on a different commit |
+| `load` | 111,193 rows in 18 tables; 687 s in all |
+
+The only README step not run literally was `docker compose up -d db`: the dev container was already running, so the rehearsal used a database of its own on it.
+
+**Tests:** pipeline 253 (+6: reference ×5, reader role), API 42 (+3: settings, pool without session options, no leaked internals), web 52 (+5: base path, wake retry ×3, wake notice; the 2 contract tests ran against the running API), browser 8 (4 paths + 4 pages at phone width). Ruff, mypy, tsc and Prettier are clean. `pip-audit` (API) and `npm audit` (web, production) report no known vulnerabilities.
+
+**Container:** built locally and run against the dev database as uid 10001 (`/health` ok, schema 9; `/api/v1/regions` 200).
+
+**Not yet verified, because it needs your accounts (§11):** CI on GitHub's runners (the workflows are written and the jobs' commands pass locally, but GitHub hasn't run them yet); the Neon, Render and Pages deployment; the smoke tests against the public URL.
+
+## 15. Answers to §12
+All eight as recommended (D-026).
+
+## 16. Departures from the plan
+- **The reader role is a CLI command, not `sql/roles/api_reader.sql`.** A SQL file would need the password on a command line or in a file; `touchgrass db create-reader` prompts for it, and is tested.
+- **`/health` doesn't report the run id** (§9 said it would). It reports the schema version; the run id is in `/api/v1/regions/{id}`. No new field for a check that already exists.
+- **The run id isn't stable across commits** (see §13), so reproduction is judged on checksums and figures.
+- **Added:** the phone-width overflow fix and its tests, a PostGIS version line in `db status`, `render.yaml`, the `TOUCHGRASS_POOL_*` and `TOUCHGRASS_SESSION_OPTIONS` settings, and `py.typed` for the API package.

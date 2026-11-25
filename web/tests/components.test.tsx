@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { bboxOf } from "../src/api/geojson";
@@ -65,6 +65,22 @@ describe("pages", () => {
     expect(pageFromPath("/about/")).toBe("about");
     expect(pageFromPath("/elsewhere")).toBe("map");
     expect([pathFor("map"), pathFor("about")]).toEqual(["/", "/about"]);
+  });
+
+  it("honours a sub-path base, as on GitHub Pages (D-026 Q3)", () => {
+    const base = "/touch-grass/";
+    expect(pageFromPath("/touch-grass/", base)).toBe("map");
+    expect(pageFromPath("/touch-grass", base)).toBe("map");
+    expect(pageFromPath("/touch-grass/rankings", base)).toBe("rankings");
+    expect(pageFromPath("/touch-grass/compare/", base)).toBe("compare");
+    expect(pageFromPath("/rankings", base)).toBe("map"); // outside the base
+    expect(pageFromPath("/touch-grassy/about", base)).toBe("map");
+    expect([pathFor("map", base), pathFor("about", base)]).toEqual([
+      "/touch-grass/",
+      "/touch-grass/about",
+    ]);
+    for (const p of ["map", "rankings", "compare", "about"] as const)
+      expect(pageFromPath(pathFor(p, base), base)).toBe(p);
   });
 });
 
@@ -371,5 +387,24 @@ describe("App", () => {
     await waitFor(() =>
       expect(screen.getByText(/The map can't load: cannot reach the API/)).toBeTruthy(),
     );
+  });
+
+  it("explains a slow first load as a waking server (D-026 Q1)", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() => new Promise<Response>(() => {})), // the host is still waking up
+      );
+      const { App, WAKE_NOTICE_AFTER_MS } = await import("../src/App");
+      render(<App />);
+      expect(screen.queryByRole("status")).toBeNull();
+      await act(async () => {
+        vi.advanceTimersByTime(WAKE_NOTICE_AFTER_MS);
+      });
+      expect(screen.getByRole("status").textContent).toMatch(/Waking the server/);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
