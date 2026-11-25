@@ -38,7 +38,7 @@ uv run pytest                            # -m data / -m db to select; db tests u
 
 ## Next steps
 
-1. `/learn:portfolio`: case study, interview notes.
+1. Portfolio notes written (`docs/PORTFOLIO.md`, local only).
 2. Optional: check the wake notice after the API has slept (15 min idle).
 
 ## Blockers / risks being watched
@@ -51,6 +51,8 @@ uv run pytest                            # -m data / -m db to select; db tests u
 ---
 
 ## Resume section
+
+> **Final, verified bullets and interview notes are in `docs/PORTFOLIO.md`, kept local (git-ignored).** The draft below is kept as the stage-by-stage record.
 
 > Draft — **only claims that are true today are listed as done.** Bullets below are *target* statements to be finalized as stages are completed; do not use them on a resume until the corresponding stage is marked complete.
 

@@ -609,3 +609,9 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
   - `VITE_API_URL` moved to a repository variable.
   - The smoke test now allows the 404 status of Pages' deep-link fallback page, and only that request.
 - **Not verified:** the wake notice on a sleeping host.
+
+## 2026-11-25 — Portfolio notes
+
+- **Created** `docs/PORTFOLIO.md`: descriptions, architecture, stack rationale, data flow, challenges, trade-offs, screenshots to capture, validation, lessons learned, future work, resume bullets, an interview walkthrough and 22 interview questions.
+- **Checked:** every figure against the database, run records, `reference.json` or this log. Where older notes disagree with today's data (park access points: 11,878 in an early Stage 5 run, 15,601 in the current network report), today's figure is used.
+- **Kept local:** you git-ignored `docs/PORTFOLIO.md`, so the README doesn't link it.
