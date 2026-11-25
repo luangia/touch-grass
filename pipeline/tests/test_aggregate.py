@@ -109,3 +109,21 @@ def test_ranking_excludes_the_city_and_small_areas() -> None:
     assert ranked(m.reset_index(), "underserved_share", ascending=False, min_pop=400)[
         "area_id"
     ].tolist() == ["A"]
+
+
+def test_straight_line_shares_sit_beside_walking_shares() -> None:
+    # b1 300 m walk / 250 m straight; b2 900 / 700; b3 200 / 100; b4 no route / 500.
+    blocks = BLOCKS.assign(straight_m=[250.0, 700.0, 100.0, 500.0])
+    _, shares = summarize_areas(with_city(MEMBERS, blocks), blocks, THRESHOLDS, 800.0)
+    s = shares.set_index(["area_id", "threshold_min"])
+    # A within 10 min: by walk 100 of 400; by straight line 400 of 400 (b2 is 700 m away).
+    assert s.loc[("A", 10), "pct_within"] == pytest.approx(0.25)
+    assert s.loc[("A", 10), "pct_within_straight"] == pytest.approx(1.0)
+    # B: b4 has no walking route but is 500 m away in a straight line.
+    assert s.loc[("B", 10), "pop_within_straight"] == 2 + 300 + 50
+    assert (s["pct_within_straight"] >= s["pct_within"]).all()
+
+
+def test_no_straight_column_means_no_straight_shares() -> None:
+    _, shares = summarize_areas(with_city(MEMBERS, BLOCKS), BLOCKS, THRESHOLDS, 800.0)
+    assert "pct_within_straight" not in shares.columns

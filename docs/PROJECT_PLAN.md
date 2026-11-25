@@ -1,6 +1,6 @@
 # Project Plan — TouchGrass
 
-> Status: **Stages 1–9 complete. Stage 10 being prepared** (not approved for implementation). Stage 11 not started.
+> Status: **Stages 1–9 complete. Stage 10 implemented (2026-11-24), awaiting your review.** Stage 11 not started.
 > See [ARCHITECTURE.md](ARCHITECTURE.md) for design and [DECISIONS.md](DECISIONS.md) for the trade-offs behind it.
 
 ## 1. Problem
@@ -270,7 +270,7 @@ Each stage: objective, functional requirements, concepts, dependencies, tasks, d
 
 ### Stage 10 — Comparison, underserved view, methodology & polish
 
-> **Being prepared.** [Lesson](learning/stage-10-comparison-and-polish.md); decisions Q1–Q8 pending. Two README questions aren't answerable in the UI yet (straight line vs network; demographics), and no licences are stored, so the methodology criterion needs data, not just a page.
+> **Implemented 2026-11-24, awaiting review.** [Lesson](learning/stage-10-comparison-and-polish.md) (§13 built, §14 results and review items); decisions in D-025. Migration 0009; Rankings and Compare pages; About as the full methodology.
 
 **Objective.** Answer the project's questions clearly in the UI.
 

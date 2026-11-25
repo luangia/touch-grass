@@ -24,6 +24,8 @@ class RawSource:
     url: str
     path: Path
     attribution: str
+    license_name: str
+    license_url: str | None
     where: str = "1=1"  # arcgis only
     vintage: str | None = None
 
@@ -36,6 +38,8 @@ def boundary_source(cfg: RegionConfig, paths: RegionPaths) -> RawSource:
         url=cfg.study_boundary.url,
         path=paths.raw_source(sid) / f"{sid}.geojson",
         attribution=cfg.study_boundary.attribution,
+        license_name=cfg.study_boundary.license.name,
+        license_url=cfg.study_boundary.license.url,
         where=cfg.study_boundary.where,
     )
 
@@ -51,6 +55,8 @@ def area_sources(cfg: RegionConfig, paths: RegionPaths) -> list[RawSource]:
                 url=area.url,
                 path=paths.raw_source(sid) / f"{sid}.geojson",
                 attribution=area.attribution,
+                license_name=area.license.name,
+                license_url=area.license.url,
                 where=area.where,
             )
         )
@@ -65,6 +71,8 @@ def tiger_source(cfg: RegionConfig, paths: RegionPaths, layer: tiger.TigerLayer)
         url=tiger.tiger_url(vintage, cfg.state_fips, layer),
         path=paths.raw_source("tiger") / tiger.tiger_filename(vintage, cfg.state_fips, layer),
         attribution=tiger.TIGER_ATTRIBUTION,
+        license_name=tiger.TIGER_LICENSE[0],
+        license_url=tiger.TIGER_LICENSE[1],
         vintage=str(vintage),
     )
 
@@ -78,6 +86,8 @@ def acs_sources(cfg: RegionConfig, paths: RegionPaths) -> list[RawSource]:
             url=acs.acs_url(year, table),
             path=paths.raw_source("acs") / acs.acs_filename(year, table),
             attribution=acs.ACS_ATTRIBUTION,
+            license_name=acs.ACS_LICENSE[0],
+            license_url=acs.ACS_LICENSE[1],
             vintage=f"{year - 4}-{year}",
         )
         for table in cfg.census.acs.tables
@@ -93,6 +103,8 @@ def osm_source(cfg: RegionConfig, paths: RegionPaths) -> RawSource | None:
         url=osm.extract_url(cfg.osm),
         path=paths.raw_source("osm") / osm.extract_filename(cfg.osm),
         attribution=osm.OSM_ATTRIBUTION,
+        license_name=osm.OSM_LICENSE[0],
+        license_url=osm.OSM_LICENSE[1],
         vintage=cfg.osm.snapshot,
     )
 
@@ -108,6 +120,8 @@ def park_validation_source(cfg: RegionConfig, paths: RegionPaths) -> RawSource |
         url=v.url,
         path=paths.raw_source(sid) / f"{sid}.geojson",
         attribution=v.attribution,
+        license_name=v.license.name,
+        license_url=v.license.url,
         where=v.where,
     )
 

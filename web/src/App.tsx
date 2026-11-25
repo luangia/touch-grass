@@ -16,6 +16,8 @@ import {
 } from "./api/client";
 import { type AreaCollection, type AreaProperties, bboxOf } from "./api/geojson";
 import { AboutPage } from "./components/AboutPage";
+import { ComparePage } from "./components/ComparePage";
+import { RankingsPage } from "./components/RankingsPage";
 import { AreaTypeToggle, ModeToggle, SearchBox, ThresholdToggle } from "./components/Controls";
 import { Legend } from "./components/Legend";
 import { type Selection, SidePanel } from "./components/SidePanel";
@@ -24,6 +26,8 @@ import { type Bounds, type Camera, type MapClick, MapView } from "./map/MapView"
 import { blockClasses, blockLegend, PARK_COLOR, shareLegend, type Theme } from "./map/style";
 import {
   formatView,
+  MAX_COMPARE,
+  PAGES,
   type Mode,
   type Page,
   pageFromPath,
@@ -163,16 +167,16 @@ export function App() {
     return () => ctl.abort();
   }, [region, areaType, threshold]);
 
-  // City-wide figures for the About page.
+  // City-wide figures: the map's start panel and the About page.
   useEffect(() => {
-    if (!region || page !== "about" || city) return;
+    if (!region || city) return;
     const ctl = new AbortController();
     api
       .metrics(region.region_id, "city", ctl.signal)
       .then((m) => setCity(m.area))
       .catch(() => undefined); // the page reads fine without the figures
     return () => ctl.abort();
-  }, [region, page, city]);
+  }, [region, city]);
 
   // Selected area → metrics.
   useEffect(() => {
@@ -202,6 +206,27 @@ export function App() {
       }
     },
     [areas, update],
+  );
+
+  // From Rankings or Compare: open the area on the map, flying to it.
+  const openOnMap = useCallback(
+    (areaId: string) => {
+      pushNext.current = true;
+      setPage("map");
+      selectArea(areaId, true);
+    },
+    [selectArea],
+  );
+  const setCompare = useCallback(
+    (ids: string[]) => update({ compare: ids.slice(0, MAX_COMPARE) }),
+    [update],
+  );
+  const toggleCompare = useCallback(
+    (id: string) =>
+      setCompare(
+        view.compare.includes(id) ? view.compare.filter((x) => x !== id) : [...view.compare, id],
+      ),
+    [setCompare, view.compare],
   );
 
   // Fly to an area named in the URL, once, when its geometry first arrives.
@@ -268,7 +293,7 @@ export function App() {
         <span className="brand-region">{region.name}</span>
       </a>
       <nav aria-label="Pages">
-        {(["map", "about"] as const).map((p) => (
+        {PAGES.map((p) => (
           <a
             key={p}
             href={pathFor(p)}
@@ -278,7 +303,12 @@ export function App() {
               navigate(p);
             }}
           >
-            {p === "map" ? "Map" : "About"}
+            {{ map: "Map", rankings: "Rankings", compare: "Compare", about: "About" }[p]}
+            {p === "compare" && view.compare.length ? (
+              <span className="count" aria-label={`${view.compare.length} picked`}>
+                {view.compare.length}
+              </span>
+            ) : null}
           </a>
         ))}
       </nav>
@@ -314,9 +344,43 @@ export function App() {
     </header>
   );
 
+  if (page === "rankings") {
+    return (
+      <div className="app app-page">
+        {header}
+        <RankingsPage
+          region={region}
+          methodology={methodology}
+          areaType={areaType}
+          threshold={threshold}
+          onAreaType={(t) => update({ areaType: t, area: null })}
+          onThreshold={(t) => update({ threshold: t }, false)}
+          onOpenArea={openOnMap}
+        />
+      </div>
+    );
+  }
+
+  if (page === "compare") {
+    return (
+      <div className="app app-page">
+        {header}
+        <ComparePage
+          region={region}
+          methodology={methodology}
+          areaType={areaType}
+          features={areas?.features ?? []}
+          selected={view.compare}
+          onChange={setCompare}
+          onOpenArea={openOnMap}
+        />
+      </div>
+    );
+  }
+
   if (page === "about") {
     return (
-      <div className="app app-about">
+      <div className="app app-page">
         {header}
         <AboutPage
           region={region}
@@ -404,6 +468,9 @@ export function App() {
         selection={selection}
         hovered={hovered}
         methodology={methodology}
+        city={city}
+        compare={view.compare}
+        onToggleCompare={toggleCompare}
         onSelectArea={(id) => selectArea(id, true)}
       />
     </div>

@@ -63,6 +63,15 @@ def test_metrics_end_to_end(analyzed: tuple[RegionConfig, RegionPaths], tmp_path
     # The per-park search agrees with Stage 6: every block is within 10 minutes here.
     assert (result.reach["parks_reachable"] > 0).all()
     assert m.loc[CITY_ID, "underserved_pop"] == 0
+    # Straight-line shares sit beside walking shares, and never below them (D-025 Q3).
+    sh = result.thresholds
+    assert sh["pct_within_straight"].notna().all()
+    assert (sh["pct_within_straight"] >= sh["pct_within"] - 1e-9).all()
+    assert {c.name for c in result.checks} >= {
+        "metrics.straight_not_below_walk",
+        "metrics.city_straight_matches_analysis",
+        "acs.sides_cover_every_resident",
+    }
 
     ctx = result.context.set_index(["area_id", "indicator"])
     # Neighborhood 1 = blocks of block group ...001 only (ACS 31 ± 9). Block group ...002 is

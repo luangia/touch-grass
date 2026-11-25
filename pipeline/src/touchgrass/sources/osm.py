@@ -33,6 +33,7 @@ from touchgrass.core.crs import STORAGE_EPSG
 from touchgrass.sources import http
 
 GEOFABRIK_BASE = "https://download.geofabrik.de"
+OSM_LICENSE = ("Open Database License (ODbL) 1.0", "https://opendatacommons.org/licenses/odbl/1-0/")
 OSM_ATTRIBUTION = (
     "© OpenStreetMap contributors, available under the Open Database License (ODbL 1.0), "
     "https://www.openstreetmap.org/copyright; extract by Geofabrik GmbH"

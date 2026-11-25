@@ -56,6 +56,8 @@ class ThresholdShare(_Model):
     threshold_m: float
     pop_within: int
     pct_within: float
+    pop_within_straight: int | None = Field(description="As the crow flies (a floor on the walk)")
+    pct_within_straight: float | None
 
 
 class ContextValue(_Model):
@@ -134,6 +136,31 @@ class Source(_Model):
     vintage: str | None
     retrieved_at: str
     attribution: str
+    license_name: str
+    license_url: str | None
+
+
+class SideValue(_Model):
+    residents: int
+    estimate: float
+    moe: float
+    reliability: Literal["high", "medium", "low"]
+
+
+class ResidentComparisonItem(_Model):
+    indicator: str
+    label: str
+    within: SideValue
+    beyond: SideValue
+    difference: float = Field(description="beyond - within, as a fraction")
+    difference_moe: float
+    clear: bool = Field(description="False when |difference| <= its margin of error")
+
+
+class ResidentComparison(_Model):
+    threshold_min: int
+    assumption: str
+    indicators: list[ResidentComparisonItem]
 
 
 class Caveat(_Model):
@@ -152,6 +179,9 @@ class Methodology(_Model):
     metrics: dict[str, object] | None = Field(description="Parameters of its area metrics")
     sources: list[Source]
     caveats: list[Caveat]
+    resident_comparison: ResidentComparison | None = Field(
+        description="Residents beyond vs within the underserved walk: who lives where, not why"
+    )
 
 
 class Health(_Model):

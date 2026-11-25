@@ -20,6 +20,7 @@ from pathlib import Path
 import pandas as pd
 
 ACS_BASE = "https://www2.census.gov/programs-surveys/acs/summary_file"
+ACS_LICENSE = ("Public domain (U.S. Government work)", None)
 ACS_ATTRIBUTION = "U.S. Census Bureau, American Community Survey 5-Year Estimates"
 BLOCK_GROUP_PREFIX = "1500000US"
 

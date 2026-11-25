@@ -527,3 +527,20 @@ TouchGrass is a public portfolio project, so clipping, reprojecting or overlayin
    - **Basemap:** OpenFreeMap `dark` (`VITE_BASEMAP_STYLE_DARK`).
    - **Map rebuild:** the map is rebuilt on a theme switch, keeping your camera position.
 
+
+---
+
+## D-025 — Answering every question in the UI: rankings, comparison, straight line vs network, demographics, licences
+
+**Status:** Accepted (2026-11-24, Stage 10 Q1–Q8, "Approve as recommended")
+
+| # | Choice |
+|---|---|
+| Q1 | Header navigation **Map · Rankings · Compare · About**: pages with their own URLs, linked both ways (a ranking row opens the map; the panel can add an area to Compare). |
+| Q2 | Charts are hand-written SVG (bars, grouped bars): few and simple, themed by the CSS tokens, no chart dependency. |
+| Q3 | Straight line vs walking route, all four: straight-line share per area as a faint bar behind the walking bar; per block "N m on foot, M m in a straight line (k× longer)"; a "where barriers cost the most" ranking (`barrier_gap` = straight-line share − walking share); city figures on About. |
+| Q4 | Demographics: per-area ACS context with ± and the reliability label (low greyed, never ranked), plus a city-level **resident** comparison: shares among residents beyond vs within the underserved walk. No neighborhood scatter plot (ecological fallacy, mixed reliability). |
+| Q5 | The resident comparison treats each side as an "area" in the D-022 allocation, so it carries ACS MOE propagation. The difference's MOE is √(MOE₁² + MOE₂²); when \|difference\| ≤ MOE the UI says "no clear difference". |
+| Q6 | Compare 2–4 areas of any type: table + grouped bars across thresholds, context rows with reliability; URL `?areas=`. |
+| Q7 | Rankings: four titled lists (lowest share, most underserved residents, priority, largest barrier gap); the floor applies to rates; top 10 then "show all"; equal displayed values are shown as ties. |
+| Q8 | Licences are data: fixed per adapter (Census TIGER/ACS: public domain; OpenStreetMap: ODbL 1.0) and a required `license` on every configured source (name, optional URL). They're stored in `datasets` and served by `/methodology`. |

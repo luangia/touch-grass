@@ -95,7 +95,8 @@ def methodology(
     ).fetchone()
     sources = conn.execute(
         f"""SELECT source_id, url, vintage, to_char(retrieved_at AT TIME ZONE 'UTC',
-                   'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS retrieved_at, attribution
+                   'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS retrieved_at, attribution, license_name,
+                   license_url
             FROM {SCHEMA}.datasets WHERE region_id = %s ORDER BY source_id""",
         (region.region_id,),
     ).fetchall()
@@ -110,4 +111,5 @@ def methodology(
         metrics=region.metrics_params,
         sources=[Source(**s) for s in sources],
         caveats=[Caveat(**c) for c in caveats],
+        resident_comparison=(region.metrics_summary or {}).get("resident_comparison"),
     )

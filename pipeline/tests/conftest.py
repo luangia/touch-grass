@@ -27,6 +27,7 @@ _CHICAGO: dict[str, Any] = {
         "url": "https://gis.example.org/arcgis/rest/services/Boundaries/MapServer/0",
         "where": "NAME = 'Chicago'",
         "attribution": "Example City GIS",
+        "license": {"name": "Test licence"},
     },
     "analysis_areas": [
         {
@@ -36,6 +37,7 @@ _CHICAGO: dict[str, Any] = {
             "key_field": "AREA_NUM",
             "name_field": "COMMUNITY",
             "attribution": "Example City GIS",
+            "license": {"name": "Test licence"},
         }
     ],
     "census": {"decennial_vintage": 2020, "acs": {"year": 2024, "tables": ["B01003"]}},

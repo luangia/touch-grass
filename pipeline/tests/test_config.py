@@ -243,3 +243,14 @@ def test_metrics_requires_network() -> None:
     data["network"] = None
     with pytest.raises(ValidationError, match="'metrics' requires 'network'"):
         RegionConfig.model_validate(data)
+
+
+def test_every_configured_source_needs_a_licence() -> None:
+    data = load_region("portland-or", REPO_CONFIG_DIR).model_dump(mode="json")
+    del data["study_boundary"]["license"]
+    with pytest.raises(ValidationError, match="license"):
+        RegionConfig.model_validate(data)
+    data = load_region("portland-or", REPO_CONFIG_DIR).model_dump(mode="json")
+    data["study_boundary"]["license"]["url"] = "http://insecure.example"
+    with pytest.raises(ValidationError, match="url"):
+        RegionConfig.model_validate(data)

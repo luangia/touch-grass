@@ -6,21 +6,21 @@ _Last updated: 2026-11-23_
 
 | Item | Status |
 |---|---|
-| Phase | **Stages 1–9 complete. Stage 10 being prepared**, not approved for implementation |
+| Phase | **Stages 1–9 complete. Stage 10 implemented (2026-11-24)**, awaiting your review |
 | Completed stages | 1 Foundations · 2 Boundaries & population · 3 Parks · 4 PostGIS · 5 Walk network · 6 Walking accessibility · 7 Neighborhood metrics · 8 API · 9 Interactive map (2026-11-23) |
-| Next stage | 10: Comparison, underserved view, methodology and polish. [Lesson](learning/stage-10-comparison-and-polish.md). **Not approved for implementation**; decisions pending |
-| Code | `pipeline/`: … + `touchgrass analyze`, `touchgrass metrics`; 242 tests. `api/`: FastAPI, 10 endpoints; 35 tests. `web/`: React + MapLibre map, About page, light/dark; 36 tests |
-| Database | schema at migration 0008; portland-or loaded (3 analysis runs; latest `7c1fc6efaf00effa`, metrics on clean commit `0747c94`) |
+| Current stage | 10: Comparison, underserved view, methodology and polish. [Lesson](learning/stage-10-comparison-and-polish.md) §13–16; decisions D-025. Review items in §14 |
+| Code | `pipeline/`: … + `touchgrass analyze`, `touchgrass metrics`; 242 tests. `api/`: FastAPI, 10 endpoints; 35 tests. `web/`: map, Rankings, Compare, About, light/dark; 47 tests. Pipeline 247, API 39 |
+| Database | schema at migration 0009; portland-or loaded (3 analysis runs; latest `7c1fc6efaf00effa`, metrics on clean commit `0747c94`) |
 | Git | `main` 4 commits ahead of `origin` (Stage 9 planning, map, review changes, redesign). Stage 10 prep docs uncommitted |
 
 ## Currently being worked on
 
-- Stage 10 preparation. Waiting on decisions and implementation approval.
+- Stage 10 implemented: every README question answered in the app (README table). Waiting on your review (lesson §14).
 - ParkServe consent request (D-016): awaiting TPL's reply. Not blocking.
 
 ## Accepted decisions (summary)
 
-See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff). Stage 2 added D-015 (data-source choices) and amended D-007 (Census interior points). Stage 3 added D-017 (dated OSM extracts + pyosmium; uv-managed Python) and D-018 (park rules and merging; amendment 2 adds `veto_tags`). Stage 4 added D-019 (COPY loading, SQL migrations, 4326-only storage, long ACS table, test database, settings). Stage 6 added D-021 (SciPy engine, no cutoff, same-edge rule, run ids from content) and fixed two Stage 5 contact bugs. Stage 9 added D-024 (Vite + React + MapLibre; colors break at the underserved line; fixed share breaks; URL state; OpenFreeMap). Stage 8 added D-023 (separate read-only API project; SQL-built GeoJSON and MVT; z12–14 tiles; ETag by run). Stage 7 added D-022 (areas, rankings, priority, reachable park area, ACS allocation, reliability) and amended D-011 (priority formula). Stage 5 added D-020 (offline OSMnx build, walk filter with shared-use paths re-admitted, largest component plus a report, edge snapping, UTM edge weights) and amended D-006 (no sampled fallback).
+See [DECISIONS.md](DECISIONS.md): Portland city limits + 2 km buffer; 2020 blocks + ACS 2020–2024 block groups; OSM parks validated against Metro ORCA; multi-source Dijkstra over the OSM walk network; "underserved" = > 10-minute (800 m) walk; proposed stack. Stage 1 added D-013 (amd64 PostGIS image under emulation) and D-014 (`exclude-newer` dependency cutoff). Stage 2 added D-015 (data-source choices) and amended D-007 (Census interior points). Stage 3 added D-017 (dated OSM extracts + pyosmium; uv-managed Python) and D-018 (park rules and merging; amendment 2 adds `veto_tags`). Stage 4 added D-019 (COPY loading, SQL migrations, 4326-only storage, long ACS table, test database, settings). Stage 6 added D-021 (SciPy engine, no cutoff, same-edge rule, run ids from content) and fixed two Stage 5 contact bugs. Stage 10 added D-025 (Rankings and Compare pages, straight line vs network, resident comparison with MOE, licences as data). Stage 9 added D-024 (Vite + React + MapLibre; colors break at the underserved line; fixed share breaks; URL state; OpenFreeMap). Stage 8 added D-023 (separate read-only API project; SQL-built GeoJSON and MVT; z12–14 tiles; ETag by run). Stage 7 added D-022 (areas, rankings, priority, reachable park area, ACS allocation, reliability) and amended D-011 (priority formula). Stage 5 added D-020 (offline OSMnx build, walk filter with shared-use paths re-admitted, largest component plus a report, edge snapping, UTM edge weights) and amended D-006 (no sampled fallback).
 
 ## How to run what exists
 
@@ -38,8 +38,8 @@ uv run pytest                            # -m data / -m db to select; db tests u
 
 ## Next steps
 
-1. Answer the Stage 10 decisions (lesson §9).
-2. Approve implementation: `/learn:implement-stage 10`.
+1. Review Stage 10 (lesson §14): Rankings, Compare, About.
+2. On approval: commit, rerun `metrics` on the clean commit and reload, then `/learn:advance` to Stage 11 (hardening, deployment, portfolio).
 
 ## Blockers / risks being watched
 

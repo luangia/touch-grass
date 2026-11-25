@@ -1,6 +1,6 @@
 # Stage 10: Comparison, Underserved View, Methodology and Polish
 
-> Status: **prepared, not implemented.**
+> Status: **implemented 2026-11-24, awaiting your review.** §13 is what was built, §14 the results and browser check, §15 the answers to §12, and §16 where the build departed from the plan.
 > Numbers marked **(prototype 2026-11-23)** come from throwaway SQL against the loaded dev database (run `7c1fc6efaf00effa`) in the scratch area. No project code was changed.
 
 ## 1. Objective and expected outcome
@@ -187,3 +187,64 @@ web: Rankings page ─ click ─► Map (area selected) ◄─ "Add to compare" 
 - Robinson (1950), ecological correlations.
 - Tufte, *The Visual Display of Quantitative Information*: data-ink and zero baselines.
 - Open Data Commons, ODbL 1.0; U.S. Census Bureau data use (public domain).
+
+## 13. What was built (2026-11-24)
+
+| Layer | Pieces |
+|---|---|
+| **Pipeline** | |
+| Straight-line shares | `aggregate.summarize_areas` adds `pop_within_straight` / `pct_within_straight` per area × threshold. Hard checks: never below the walking share; the city equals Stage 6's own summary (±0.00005) |
+| Residents beyond vs within | `acs_alloc.compare_sides` treats each side as an area in the D-022 allocation, so it inherits the MOE propagation. Difference MOE = √(MOE² + MOE²); `clear` = \|diff\| > MOE. Hard check: the two sides cover every resident. Stored in `metrics_runs.summary.resident_comparison`, and in the report |
+| Licences | `SourceLicense` (name + optional https URL) is **required** on every configured ArcGIS source. Adapters set Census = public domain and OSM = ODbL 1.0. The loader refuses a source without a licence. Portland: RLIS EULA (boundary, ORCA) and the City Data Distribution Policy (neighborhoods, districts) |
+| Migration 0009 | `area_thresholds.pop_within_straight` / `pct_within_straight` (CHECK ≥ walking share), `datasets.license_name` / `license_url` |
+| **API** | |
+| Schema and caching | Schema 9; `RESPONSE_VERSION = 3` |
+| New fields | Straight-line shares in `/areas`, metrics and compare; tiles carry `straight_m` and `detour_ratio`; `/methodology` carries licences and the resident comparison |
+| Rankings | New `barrier_gap` metric (rate, floored); `underserved_pop` and `priority_score` stay tied to the underserved threshold |
+| **Web** | |
+| Navigation | Header: Map · Rankings · Compare (with a count of picks) · About |
+| `RankingsPage` | Four titled lists, ties shown as "=", rows open the map |
+| `ComparePage` | Picker, chips, "+ Whole city", grouped SVG bars, a table with walking · straight-line shares and census context (low greyed); `?compare=` in the URL |
+| `charts.tsx` | Walking vs straight-line bars; grouped bars |
+| `context.tsx` | Context list with ± and reliability badges, never sorted; comparison sentences with "no clear difference" |
+| Panel | Ghost bars, census context, "+ Add to compare", the block detour line, and the city summary on the start panel |
+| About | Straight-line table, "Who lives farther from parks", a licence per source, a parameters table plus every raw parameter |
+| **Tests** | Pipeline 247 (+5), API 39 (+4), web 47 (+11: ties, chart scale, wording, context, detour, parameters, Rankings, Compare) |
+
+**Found while building:**
+- **Generated types caught drift.** Regenerating the API types made the web test fixtures fail to compile (missing licence and straight-line fields): the contract working as intended.
+- **The car-free sentence was wrong at first.** "9.8% of residents" misstates a *household* share. The sentence is now neutral ("9.8% where residents live farther than…"), with the difference in percentage points.
+- **The prototype's car-free figures were off.** It averaged block-group shares weighted by people (12.4% within); allocating household counts gives 14.3% within, 9.8% beyond.
+- **A clipped chart label:** the longest bar's label ran off the chart; the right margin is now wider.
+
+## 14. Results on Portland (2026-11-24, run `7c1fc6efaf00effa`)
+
+| | |
+|---|---|
+| Straight line vs walking route (city) | 5 / 10 / 15 min: 67.6 / 97.2 / 100.0% vs 43.7 / 85.0 / 97.5% |
+| Where barriers cost the most (10 min) | Sylvan-Highlands 65 points (33% vs 98%), Maplewood 48, North Tabor 43, Sumner 42, Parkrose 42 |
+| Residents farther than vs within 10 min | People of color **38.5% ± 1.2 vs 33.3% ± 0.6: +5.2 ± 1.3 points, clear**. Households with no vehicle **9.8% ± 1.0 vs 14.3% ± 0.6: −4.5 ± 1.2 points, clear** |
+| Licences | All 11 sources: public domain (TIGER, ACS), ODbL 1.0 (OSM), RLIS EULA (city boundary, ORCA), City Data Distribution Policy (neighborhoods, districts) |
+
+**Browser check (light and dark, pane at 700 px, no console errors):**
+- Rankings: four lists; clicking Sylvan-Highlands opens the map there, with the panel showing 33% · 98%.
+- "+ Add to compare", then the Compare page: the nav badge shows 2; the chart and table appear; chips can be removed.
+- About: all sections, licences and parameters.
+- Block view, dark mode: "1,222 m to Frazer Park … 921 m in a straight line: the walk is 1.3× as long".
+
+### Review for you (acceptance)
+1. Can you answer each README question from the app? The README now links each question to the view that answers it.
+2. Read "Who lives farther from parks" on About. Is the wording right: neutral, with margins, and "not why"?
+3. Rankings: are the four list titles clear?
+
+## 15. Answers to §12
+1. **Sylvan-Highlands (98% vs 33%):** a hillside neighborhood with curving streets, few through-connections, and Highway 26 along its edge. A park can be close as the crow flies and still a long walk: the street pattern, not the distance, decides. A buffer analysis (a circle around each park) can't see this at all.
+2. **Car-free households live closer to parks:** a non-causal reason is that they concentrate in dense inner neighborhoods with older street grids, transit and small parks. Density drives both.
+3. **4.8 ± 5 points:** the UI says "no clear difference: the gap is within the margin of error". That doesn't mean "no difference": the true gap could be 0 or nearly 10. The data can't tell, and saying so is the honest result.
+4. **Share and count separately:** a share (rate) and a count (scale) answer different questions: "where is it worst?" and "where are the most people affected?". Any combined score hides a weighting choice the reader can't see. Two titled lists make the choice explicit.
+
+## 16. Departures from the plan
+- **The resident comparison lives in the metrics run summary** (served by `/methodology`), not a new table. It's a handful of numbers per run.
+- **Straight-line shares for old runs are NULL** (the column is nullable); `metrics` must be rerun to fill them, which it was for the latest run.
+- **Compare picks come from the current area type plus the whole city.** Mixing types works through the URL but has no picker.
+

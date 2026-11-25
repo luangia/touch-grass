@@ -248,3 +248,40 @@ def test_openapi_documents_every_endpoint(client: TestClient) -> None:
         "/api/v1/regions/{region_id}/parks",
         "/api/v1/regions/{region_id}/tiles/blocks/{z}/{x}/{y}.pbf",
     }
+
+
+# ------------------------------------------------------------------- Stage 10 (D-025)
+
+
+def test_straight_line_shares_beside_walking_shares(client: TestClient) -> None:
+    city = client.get(url("/areas/city/metrics")).json()["area"]
+    for t in city["thresholds"]:
+        assert t["pct_within_straight"] is not None
+        assert t["pct_within_straight"] >= t["pct_within"] - 1e-9
+    fc = client.get(url("/areas?type=neighborhood")).json()
+    assert all("pct_within_straight" in f["properties"] for f in fc["features"])
+
+
+def test_barrier_gap_ranking(client: TestClient) -> None:
+    r = Ranking.model_validate(
+        client.get(url("/rankings?type=district&metric=barrier_gap&threshold=5")).json()
+    )
+    assert r.order == "desc" and r.min_residents == 15  # a rate: the floor applies
+    values = [e.value for e in r.entries]
+    assert values == sorted(values, reverse=True) and all(v >= 0 for v in values)
+
+
+def test_methodology_lists_licences(client: TestClient) -> None:
+    m = Methodology.model_validate(client.get(url("/methodology")).json())
+    licences = {s.source_id: s.license_name for s in m.sources}
+    assert licences["tiger_tabblock20"] == "Public domain (U.S. Government work)"
+    assert licences["study_boundary"] == "Test licence"
+    # The synthetic region has no share indicators, so nothing to compare: an empty list.
+    assert m.resident_comparison is not None and m.resident_comparison.indicators == []
+
+
+def test_block_tiles_carry_straight_line_distance(client: TestClient, seeded: Seeded) -> None:
+    x, y = tile_of(-123.005, 45.005, 12)
+    layer = mapbox_vector_tile.decode(client.get(url(f"/tiles/blocks/12/{x}/{y}.pbf")).content)
+    props = [f["properties"] for f in layer["blocks"]["features"]]
+    assert all(p["straight_m"] <= p["network_m"] + 30 for p in props)  # D-021 slack

@@ -374,6 +374,8 @@ export interface components {
             sources: components["schemas"]["Source"][];
             /** Caveats */
             caveats: components["schemas"]["Caveat"][];
+            /** @description Residents beyond vs within the underserved walk: who lives where, not why */
+            resident_comparison: components["schemas"]["ResidentComparison"] | null;
         };
         /**
          * Order
@@ -384,7 +386,7 @@ export interface components {
          * RankMetric
          * @enum {string}
          */
-        RankMetric: "pct_within" | "underserved_pop" | "priority_score";
+        RankMetric: "pct_within" | "underserved_pop" | "priority_score" | "barrier_gap";
         /** Ranking */
         Ranking: {
             /** Region Id */
@@ -481,6 +483,50 @@ export interface components {
             /** Latest Run Id */
             latest_run_id: string | null;
         };
+        /** ResidentComparison */
+        ResidentComparison: {
+            /** Threshold Min */
+            threshold_min: number;
+            /** Assumption */
+            assumption: string;
+            /** Indicators */
+            indicators: components["schemas"]["ResidentComparisonItem"][];
+        };
+        /** ResidentComparisonItem */
+        ResidentComparisonItem: {
+            /** Indicator */
+            indicator: string;
+            /** Label */
+            label: string;
+            within: components["schemas"]["SideValue"];
+            beyond: components["schemas"]["SideValue"];
+            /**
+             * Difference
+             * @description beyond - within, as a fraction
+             */
+            difference: number;
+            /** Difference Moe */
+            difference_moe: number;
+            /**
+             * Clear
+             * @description False when |difference| <= its margin of error
+             */
+            clear: boolean;
+        };
+        /** SideValue */
+        SideValue: {
+            /** Residents */
+            residents: number;
+            /** Estimate */
+            estimate: number;
+            /** Moe */
+            moe: number;
+            /**
+             * Reliability
+             * @enum {string}
+             */
+            reliability: "high" | "medium" | "low";
+        };
         /** Source */
         Source: {
             /** Source Id */
@@ -493,6 +539,10 @@ export interface components {
             retrieved_at: string;
             /** Attribution */
             attribution: string;
+            /** License Name */
+            license_name: string;
+            /** License Url */
+            license_url: string | null;
         };
         /** Threshold */
         Threshold: {
@@ -511,6 +561,13 @@ export interface components {
             pop_within: number;
             /** Pct Within */
             pct_within: number;
+            /**
+             * Pop Within Straight
+             * @description As the crow flies (a floor on the walk)
+             */
+            pop_within_straight: number | null;
+            /** Pct Within Straight */
+            pct_within_straight: number | null;
         };
         /** ValidationError */
         ValidationError: {

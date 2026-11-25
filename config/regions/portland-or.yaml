@@ -35,6 +35,9 @@ study_boundary:
   # RLIS Open Database EULA (2023-02-01) requires this statement + a link to the licence.
   attribution: >-
     Regional Land Information System data are a product of Metro and made publicly available according to the license agreement found in https://rlisdiscovery.oregonmetro.gov/pages/open-database-license
+  license: # RLIS Open Database EULA 2023-02-01, verified 2026-11-22
+    name: RLIS Open Database End User License Agreement (2023-02-01)
+    url: https://rlisdiscovery.oregonmetro.gov/pages/open-database-license
 
 analysis_areas:
   # One polygon per neighborhood association; shared areas overlap (D-015 Q1).
@@ -47,6 +50,8 @@ analysis_areas:
     name_field: NAME
     allow_overlaps: true
     attribution: City of Portland Bureau of Planning and Sustainability
+    license: # layer metadata, verified 2026-11-22: public use, provided as is
+      name: City of Portland Data Distribution Policy (public use, provided as is)
 
   # Built from 2020 census blocks; pop_total reconciles our block sums (D-015 Q3).
   - area_type: council_district
@@ -57,6 +62,8 @@ analysis_areas:
     allow_overlaps: false
     population_check_field: pop_total
     attribution: City of Portland City Elections Office
+    license: # layer metadata, verified 2026-11-22: public use, provided as is
+      name: City of Portland Data Distribution Policy (public use, provided as is)
 
 census:
   decennial_vintage: 2020
@@ -130,6 +137,9 @@ parks:
     where: "UNITTYPE IN ('Park','Natural Area') AND STATUS <> 'Planned'"
     attribution: >-
       Regional Land Information System data are a product of Metro and made publicly available according to the license agreement found in https://rlisdiscovery.oregonmetro.gov/pages/open-database-license
+    license: # RLIS Open Database EULA 2023-02-01, verified 2026-11-22
+      name: RLIS Open Database End User License Agreement (2023-02-01)
+      url: https://rlisdiscovery.oregonmetro.gov/pages/open-database-license
   # Large, well-known parks that must survive the rules (catches tag surprises).
   sentinel_parks:
     - Forest Park

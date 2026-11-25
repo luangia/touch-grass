@@ -545,3 +545,23 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 
 **Created:** `docs/learning/stage-10-comparison-and-polish.md` (Q1–Q8 pending).
 
+## 2026-11-24 — Stage 10 implemented (approved "Approve as recommended", Q1–Q8)
+
+**Decisions:** D-025.
+
+**Built:** lesson §13.
+- **Pipeline:** straight-line shares; the resident comparison with MOE; licences in config and adapters; migration 0009; the loader.
+- **API:** schema 9 and response version 3; the barrier ranking, tile attributes, and licences plus the comparison in `/methodology`.
+- **Web:** Rankings, Compare, the charts, context, panel additions, and About as the full methodology.
+
+**Results (lesson §14):**
+- City straight-line vs walking route at 10 min: 97.2% vs 85.0%. The largest barrier gap is Sylvan-Highlands, 65 points.
+- People of color are +5.2 ± 1.3 points among residents farther than 10 min (clear). Households with no vehicle are −4.5 ± 1.2 points (clear).
+- All 11 sources carry a licence.
+
+**Fixes found while building:** generated types caught fixture drift; the car-free wording misstated a household share; the prototype's car-free figures used person weights; a chart label was clipped.
+
+**Tests:** pipeline 247, API 39, web 47. Ruff, mypy, tsc and Prettier are clean; the build works. Browser-checked in light and dark mode, at 700 px.
+
+**Not verified:** a desktop-width browser check (the pane stayed at 700 px); a real phone. Nothing committed. The metrics record shows uncommitted code until committed and rerun.
+

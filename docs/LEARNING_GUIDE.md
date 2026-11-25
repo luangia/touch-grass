@@ -110,5 +110,5 @@ Each concept is taught with: **Intuition → Problem → Mechanics → Implement
 - [Stage 7 — Neighborhood aggregation & underserved metrics](learning/stage-07-neighborhood-metrics.md) (complete)
 - [Stage 8 — FastAPI backend](learning/stage-08-fastapi-backend.md) (complete)
 - [Stage 9 — Interactive map](learning/stage-09-interactive-map.md) (complete)
-- [Stage 10 — Comparison, underserved view, methodology & polish](learning/stage-10-comparison-and-polish.md) (prepared)
+- [Stage 10 — Comparison, underserved view, methodology & polish](learning/stage-10-comparison-and-polish.md) (implemented, awaiting review)
 - [Deep dive: Coordinate Reference Systems](learning/deep-dive-crs.md)

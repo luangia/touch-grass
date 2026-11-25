@@ -70,6 +70,13 @@ class AnalysisParams(_StrictModel):
 # ---------------------------------------------------------------------------- sources
 
 
+class SourceLicense(_StrictModel):
+    """What you may do with a source's data (D-025 Q8). Attribution says whom to credit."""
+
+    name: str = Field(min_length=1, description="Licence or terms, e.g. 'ODbL 1.0'")
+    url: str | None = Field(default=None, pattern=r"^https://\S+$", description="Where to read it")
+
+
 class ArcGISLayerSource(_StrictModel):
     """One layer of an Esri ArcGIS Server (MapServer or FeatureServer) REST service.
 
@@ -83,6 +90,7 @@ class ArcGISLayerSource(_StrictModel):
     )
     where: str = Field(default="1=1", min_length=1, description="Server-side attribute filter")
     attribution: str = Field(min_length=1, description="Required credit line for the data")
+    license: SourceLicense = Field(description="Terms the data is published under (D-025 Q8)")
 
 
 class AnalysisAreaSource(ArcGISLayerSource):

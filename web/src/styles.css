@@ -140,7 +140,7 @@ button.link {
   height: 100vh;
   background: var(--bg);
 }
-.app-about {
+.app-page {
   display: block;
   height: auto;
   min-height: 100vh;
@@ -575,7 +575,7 @@ dd {
 }
 .stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
   margin: 28px 0 8px;
 }
@@ -651,5 +651,329 @@ dd {
   }
   .about-page h1 {
     font-size: 28px;
+  }
+}
+
+/* ------------------------------------------------------- Stage 10 (D-025) */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.page {
+  padding: 40px 20px 64px;
+}
+.page article {
+  max-width: 680px;
+  margin: 0 auto;
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1.65;
+}
+.page article.wide {
+  max-width: 1040px;
+}
+.page h1 {
+  font-size: 34px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+.page .lead {
+  font-size: 18px;
+}
+.page-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 24px;
+  margin: 20px 0;
+}
+.topbar nav .count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--accent);
+  color: #ffffff;
+}
+:root[data-theme="dark"] .topbar nav .count {
+  color: var(--on-ink);
+}
+
+/* Chips (compare picks, "add to compare"). */
+.chip {
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+}
+.chips .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: default;
+}
+.chips .chip button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+}
+
+/* Walking vs straight-line bars. */
+.walk-bars {
+  margin: 14px 0;
+}
+.walk-bars ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.walk-bars li {
+  display: grid;
+  grid-template-columns: 130px 1fr 86px;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+  color: var(--ink-2);
+}
+.walk-bars li.current {
+  color: var(--ink);
+  font-weight: 600;
+}
+.walk-bars .track {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.walk-bars .straight,
+.walk-bars .walking {
+  position: absolute;
+  inset: 0 auto 0 0;
+}
+.walk-bars .straight {
+  background: var(--line-strong);
+}
+.walk-bars .value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+.walk-bars figcaption {
+  margin-top: 4px;
+}
+
+/* Census context. */
+.context {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.context .note {
+  margin: 2px 0 6px;
+}
+.context dl {
+  margin: 0;
+}
+.ctx-low,
+td.ctx-low {
+  color: var(--muted);
+}
+.badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  border: 1px solid var(--line-strong);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.badge-high {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.badge-low {
+  border-style: dashed;
+}
+
+/* Rankings. */
+.ranking-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+  gap: 24px 32px;
+}
+.ranking {
+  padding: 18px 20px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.ranking h2 {
+  font-size: 16px;
+  margin: 0 0 4px;
+  color: var(--ink);
+}
+.rank-rows {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+}
+.rank-rows li {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  grid-template-areas: "rank name value" "rank ctx ctx";
+  column-gap: 8px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+}
+.rank {
+  grid-area: rank;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.rank-name {
+  grid-area: name;
+  justify-self: start;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.rank-name:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.rank-value {
+  grid-area: value;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.rank-context {
+  grid-area: ctx;
+  font-size: 12px;
+}
+
+/* Compare. */
+.grouped-bars {
+  margin: 8px 0 24px;
+}
+.grouped-bars svg {
+  max-width: 760px;
+  display: block;
+}
+.grouped-bars .gridline {
+  stroke: var(--line);
+}
+.grouped-bars .axis,
+.grouped-bars .bar-label {
+  fill: var(--muted);
+  font-size: 11px;
+}
+.grouped-bars .group-label {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.table-scroll {
+  overflow-x: auto;
+}
+.compare-table,
+.mini-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.compare-table th,
+.compare-table td,
+.mini-table th,
+.mini-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.compare-table thead th {
+  color: var(--ink);
+  border-bottom: 1px solid var(--line-strong);
+}
+.compare-table tbody th,
+.mini-table th {
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.raw-params summary {
+  cursor: pointer;
+  color: var(--ink);
+  margin-top: 12px;
+}
+.raw-params pre {
+  font-size: 12px;
+  overflow-x: auto;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+@media (max-width: 760px) {
+  .page h1 {
+    font-size: 28px;
+  }
+  .ranking-grid {
+    grid-template-columns: 1fr;
+  }
+  .walk-bars li {
+    grid-template-columns: 110px 1fr 80px;
   }
 }

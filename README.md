@@ -2,7 +2,7 @@
 
 **How far is nature, really?** TouchGrass measures how easily residents can *walk* to parks and natural areas, neighborhood by neighborhood — starting with Portland, Oregon, and designed to support more cities through configuration.
 
-> **Status: Stages 1–9 of 11 implemented**: the data pipeline, walking-distance analysis, neighborhood metrics, a read-only API, and an interactive map. See [docs/CURRENT_STATUS.md](docs/CURRENT_STATUS.md).
+> **Status: Stages 1–10 of 11 implemented**: the data pipeline, walking-distance analysis, neighborhood metrics, a read-only API, and an interactive map with rankings, comparison and a full methodology page. See [docs/CURRENT_STATUS.md](docs/CURRENT_STATUS.md).
 
 ## Quickstart (what works today)
 
@@ -38,12 +38,16 @@ Adding a city = adding `config/regions/<region-id>.yaml` (more fields arrive in 
 
 ## Questions it answers
 
-- How accessible are parks and natural spaces to residents?
-- Which neighborhoods have the best and worst access to nature?
-- How far must someone walk to reach a park — on the actual pedestrian network?
-- How does real walking distance differ from straight-line distance?
-- Which neighborhoods have many residents beyond a 10-minute walk?
-- Are there geographic or demographic disparities in access? (Observed patterns, not causal claims.)
+Each is answered in the app (Stage 10):
+
+| Question | Where |
+|---|---|
+| How accessible are parks and natural spaces to residents? | Map start panel; About figures |
+| Which neighborhoods have the best and worst access to nature? | Rankings: lowest share; the residents map view |
+| How far must someone walk to reach a park, on the actual pedestrian network? | Map, "Walk from each block" view: click a block |
+| How does real walking distance differ from straight-line distance? | Panel walking vs straight-line bars; block detour; Rankings: "where barriers cost the most"; About table |
+| Which neighborhoods have many residents beyond a 10-minute walk? | Rankings: most residents farther than 10 minutes, and concentration |
+| Are there geographic or demographic disparities in access? (Observed patterns, not causal claims.) | About: who lives farther from parks (with margins of error); census context per area and in Compare |
 
 ## Approach (planned)
 

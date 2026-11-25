@@ -38,6 +38,7 @@ def parks_config(sentinels: list[str]) -> RegionConfig:
             "adapter": "arcgis_feature_layer",
             "url": ORCA_URL,
             "attribution": "test",
+            "license": {"name": "Test licence"},
         },
         "sentinel_parks": sentinels,
     }

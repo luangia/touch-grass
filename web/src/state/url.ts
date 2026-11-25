@@ -6,14 +6,19 @@ export const MODES: Mode[] = ["residents", "blocks"];
 
 export type ViewState = {
   mode: Mode | null;
+  /** Areas picked for the Compare page (D-025 Q6). */
+  compare: string[];
   region: string | null;
   areaType: string | null;
   threshold: number | null;
   area: string | null;
 };
 
+export const MAX_COMPARE = 4;
+
 export const EMPTY: ViewState = {
   mode: null,
+  compare: [],
   region: null,
   areaType: null,
   threshold: null,
@@ -25,8 +30,13 @@ export function parseView(search: string): ViewState {
   const t = q.get("threshold");
   const threshold = t !== null && /^\d+$/.test(t) ? Number(t) : null;
   const m = q.get("view");
+  const compare = (q.get("compare") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   return {
     mode: MODES.includes(m as Mode) ? (m as Mode) : null,
+    compare: [...new Set(compare)].slice(0, MAX_COMPARE),
     region: q.get("region") || null,
     areaType: q.get("type") || null,
     threshold,
@@ -41,17 +51,20 @@ export function formatView(view: ViewState): string {
   if (view.areaType) q.set("type", view.areaType);
   if (view.threshold !== null) q.set("threshold", String(view.threshold));
   if (view.area) q.set("area", view.area);
+  if (view.compare.length) q.set("compare", view.compare.join(","));
   const s = q.toString();
   return s ? `?${s}` : "";
 }
 
-/** Two pages: the map at the root and About at /about (no router library needed). */
-export type Page = "map" | "about";
+/** Pages by path, no router library needed (D-025 Q1). */
+export type Page = "map" | "rankings" | "compare" | "about";
+export const PAGES: Page[] = ["map", "rankings", "compare", "about"];
 
 export function pageFromPath(pathname: string): Page {
-  return /\/about\/?$/.test(pathname) ? "about" : "map";
+  const m = pathname.match(/^\/(rankings|compare|about)\/?$/);
+  return m ? (m[1] as Page) : "map";
 }
 
 export function pathFor(page: Page): string {
-  return page === "about" ? "/about" : "/";
+  return page === "map" ? "/" : `/${page}`;
 }

@@ -19,7 +19,7 @@ from touchgrass_api.db import SCHEMA, Conn
 # format: bump this whenever an endpoint's output changes for an unchanged run (e.g. a new tile
 # attribute), or browsers keep serving the old version (found in Stage 9: tiles without park
 # names after nearest_park_name was added).
-RESPONSE_VERSION = 2
+RESPONSE_VERSION = 3  # 3: straight-line shares, licences, resident comparison (Stage 10)
 
 RegionId = Annotated[str, PathParam(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$", max_length=64)]
 

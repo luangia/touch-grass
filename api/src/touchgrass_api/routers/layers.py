@@ -58,7 +58,8 @@ _TILE = f"""
 WITH env AS (SELECT ST_TileEnvelope(%(z)s, %(x)s, %(y)s) AS e),
 b AS MATERIALIZED (
     SELECT ST_AsMVTGeom(ST_Transform(cb.geom, 3857), env.e, {EXTENT}, {BUFFER}, true) AS geom,
-           cb.geoid20, ba.pop20, ba.reachable, ba.network_m, ba.walk_min,
+           cb.geoid20, ba.pop20, ba.reachable, ba.network_m, ba.walk_min, ba.straight_m,
+           ba.detour_ratio,
            ba.nearest_park_id, pk.name AS nearest_park_name, r.parks_reachable,
            r.reachable_park_ha
     FROM env, {SCHEMA}.census_blocks cb

@@ -10,6 +10,11 @@ export type AreaMetrics = Schemas["AreaMetrics"];
 export type AreaMetricsResponse = Schemas["AreaMetricsResponse"];
 export type Methodology = Schemas["Methodology"];
 export type Threshold = Schemas["Threshold"];
+export type Ranking = Schemas["Ranking"];
+export type Comparison = Schemas["Comparison"];
+export type ResidentComparison = Schemas["ResidentComparison"];
+export type ContextValue = Schemas["ContextValue"];
+export type RankMetric = "pct_within" | "underserved_pop" | "priority_score" | "barrier_gap";
 
 export const API_URL: string = (import.meta.env.VITE_API_URL ?? "http://localhost:8000").replace(
   /\/$/,
@@ -61,6 +66,21 @@ export const api = {
   metrics: (id: string, areaId: string, signal?: AbortSignal) =>
     getJson<AreaMetricsResponse>(
       `${region(id)}/areas/${encodeURIComponent(areaId)}/metrics`,
+      signal,
+    ),
+  rankings: (
+    id: string,
+    q: { areaType: string; metric: RankMetric; threshold: number; limit: number },
+    signal?: AbortSignal,
+  ) =>
+    getJson<Ranking>(
+      `${region(id)}/rankings?type=${encodeURIComponent(q.areaType)}&metric=${q.metric}` +
+        `&threshold=${q.threshold}&limit=${q.limit}`,
+      signal,
+    ),
+  compare: (id: string, areaIds: string[], signal?: AbortSignal) =>
+    getJson<Comparison>(
+      `${region(id)}/compare?area_ids=${areaIds.map(encodeURIComponent).join(",")}`,
       signal,
     ),
   parksUrl: (id: string) => `${API_URL}${region(id)}/parks`,

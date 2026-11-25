@@ -24,6 +24,8 @@ Reliability: CV = (MOE / 1.645) / estimate (1.645 = z for the 90% level ACS uses
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 
@@ -210,3 +212,61 @@ def area_indicators(
             )
     out = pd.DataFrame(rows)
     return out.sort_values(["area_id", "indicator"], ignore_index=True) if len(out) else out
+
+
+def compare_sides(
+    sides: pd.DataFrame,
+    block_pop: pd.Series,
+    bg_total: pd.Series,
+    block_groups: pd.DataFrame,
+    indicators: list[AcsIndicator],
+    cv_high_max: float,
+    cv_medium_max: float,
+) -> list[dict[str, Any]]:
+    """Share indicators among residents on each side of a line, with MOE (D-025 Q4-Q5).
+
+    ``sides``: side ("within" / "beyond"), geoid20, one row per populated block. Each side is
+    allocated like an area (D-022 Q5): a block group's composition is spread evenly over its
+    2020 population. The difference's MOE is sqrt(MOE_w^2 + MOE_b^2), conservative because both
+    sides share block groups; a difference no larger than its MOE is "not clear".
+    """
+    weights = allocation_weights(
+        sides.rename(columns={"side": "area_id"})[["area_id", "geoid20"]], block_pop, bg_total
+    )
+    shares = [i for i in indicators if i.kind == "share"]
+    ctx = area_indicators(weights, block_groups, shares, cv_high_max, cv_medium_max)
+    residents = (
+        sides.assign(pop20=block_pop.reindex(sides["geoid20"]).to_numpy())
+        .groupby("side")["pop20"]
+        .sum()
+    )
+    out: list[dict[str, Any]] = []
+    for ind in shares:
+        rows = ctx[ctx["indicator"] == ind.id].set_index("area_id")
+        if not {"within", "beyond"} <= set(rows.index):
+            continue
+        w, b = rows.loc["within"], rows.loc["beyond"]
+        diff = float(b["estimate"] - w["estimate"])
+        diff_moe = float(np.sqrt(w["moe"] ** 2 + b["moe"] ** 2))
+        out.append(
+            {
+                "indicator": ind.id,
+                "label": ind.label,
+                "within": {
+                    "residents": int(residents.get("within", 0)),
+                    "estimate": float(w["estimate"]),
+                    "moe": float(w["moe"]),
+                    "reliability": str(w["reliability"]),
+                },
+                "beyond": {
+                    "residents": int(residents.get("beyond", 0)),
+                    "estimate": float(b["estimate"]),
+                    "moe": float(b["moe"]),
+                    "reliability": str(b["reliability"]),
+                },
+                "difference": diff,
+                "difference_moe": diff_moe,
+                "clear": bool(abs(diff) > diff_moe),
+            }
+        )
+    return out

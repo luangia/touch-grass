@@ -16,6 +16,8 @@ import pyogrio
 
 TIGER_BASE = "https://www2.census.gov/geo/tiger"
 TIGER_CRS = 4269  # NAD83 geographic
+# U.S. Government works are not subject to copyright (17 U.S.C. § 105).
+TIGER_LICENSE = ("Public domain (U.S. Government work)", None)
 TIGER_ATTRIBUTION = "U.S. Census Bureau, TIGER/Line Shapefiles"
 
 TigerLayer = Literal["tabblock20", "bg"]

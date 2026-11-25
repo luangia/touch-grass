@@ -56,8 +56,11 @@ def summarize_areas(
 
     ``groups``: area_id, area_type, geoid20 (from :func:`with_city`).
     ``blocks``: one row per populated block: geoid20, pop20, distance_m (inf = unreachable),
-    land_m2, reach_ha (park area reachable within the underserved distance).
+    land_m2, reach_ha (park area reachable within the underserved distance), and optionally
+    straight_m (straight-line distance to the nearest park polygon: a floor on the walk), which
+    adds pop_within_straight / pct_within_straight to the shares (D-025 Q3).
     """
+    has_straight = "straight_m" in blocks.columns
     b = blocks.set_index("geoid20")
     g = groups.merge(b, left_on="geoid20", right_index=True, how="inner")
     metrics: list[dict[str, Any]] = []
@@ -91,17 +94,21 @@ def summarize_areas(
                 "reachable_park_ha_median": weighted_median(a["reach_ha"].to_numpy(), pop),
             }
         )
+        straight = a["straight_m"].to_numpy(dtype=float) if has_straight else None
         for minutes, dist in sorted(thresholds_m.items()):
             within = float(pop[d <= dist].sum())
-            shares.append(
-                {
-                    "area_id": area_id,
-                    "threshold_min": minutes,
-                    "threshold_m": dist,
-                    "pop_within": int(within),
-                    "pct_within": within / total if total else np.nan,
-                }
-            )
+            row: dict[str, Any] = {
+                "area_id": area_id,
+                "threshold_min": minutes,
+                "threshold_m": dist,
+                "pop_within": int(within),
+                "pct_within": within / total if total else np.nan,
+            }
+            if straight is not None:
+                crow = float(pop[straight <= dist].sum())
+                row["pop_within_straight"] = int(crow)
+                row["pct_within_straight"] = crow / total if total else np.nan
+            shares.append(row)
     return pd.DataFrame(metrics), pd.DataFrame(shares)
 
 

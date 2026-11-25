@@ -60,6 +60,7 @@ def config() -> RegionConfig:
             "name_field": "NAME",
             "allow_overlaps": overlaps,
             "attribution": "test",
+            "license": {"name": "Test licence"},
         }
         if check:
             out["population_check_field"] = check
@@ -79,6 +80,7 @@ def config() -> RegionConfig:
                 "adapter": "arcgis_feature_layer",
                 "url": f"{URL}/0",
                 "attribution": "test",
+                "license": {"name": "Test licence"},
             },
             "analysis_areas": [
                 area("neighborhood", "ID", overlaps=True),

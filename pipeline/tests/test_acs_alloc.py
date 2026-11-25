@@ -152,3 +152,26 @@ def test_suppressed_values_make_the_estimate_undefined_not_zero() -> None:
     assert out.loc[("N", "pop"), "estimate"] == pytest.approx(400)  # G1 only: unaffected
     assert math.isnan(out.loc[("S", "pop"), "estimate"])
     assert out.loc[("S", "pop"), "reliability"] == LOW
+
+
+def test_compare_sides_allocates_each_side_like_an_area() -> None:
+    from touchgrass.core.acs_alloc import compare_sides
+
+    # Block group ...001 (both blocks) is "within"; block ...002001 of the straddler is "beyond".
+    sides = pd.DataFrame(
+        {
+            "side": ["within", "within", "beyond"],
+            "geoid20": ["990010001001001", "990010001001002", "990010001002001"],
+        }
+    )
+    out = compare_sides(sides, BLOCK_POP, BG_TOTAL, BGS, [ZERO_VEHICLE, POP], 0.15, 0.30)
+    assert [c["indicator"] for c in out] == ["zero_vehicle"]  # counts aren't compared
+    c = out[0]
+    assert c["within"]["residents"] == 40 and c["beyond"]["residents"] == 40
+    assert c["within"]["estimate"] == pytest.approx(10 / 100)  # all of G1
+    assert c["beyond"]["estimate"] == pytest.approx((0.4 * 50) / (0.4 * 500))  # 40% of G2
+    assert c["difference"] == pytest.approx(0.0)
+    assert c["clear"] is False  # a zero difference is never "clear"
+    assert c["difference_moe"] == pytest.approx(
+        math.sqrt(c["within"]["moe"] ** 2 + c["beyond"]["moe"] ** 2)
+    )

@@ -4,8 +4,10 @@ import type { AreaMetrics, Methodology, RegionDetail } from "../api/client";
 import type { AreaProperties } from "../api/geojson";
 import { displayName, int, meters, minutes, pct, typeLabel } from "../format";
 import type { BlockProperties } from "../map/MapView";
-import { type BlockClass, blockClassOf, SHARE_COLORS, shareClassIndex } from "../map/style";
-import type { Mode } from "../state/url";
+import { type BlockClass, blockClassOf } from "../map/style";
+import { MAX_COMPARE, type Mode } from "../state/url";
+import { WalkVsStraightBars } from "./charts";
+import { ContextList, indicatorLabels } from "./context";
 
 export type Selection = {
   areaId: string | null;
@@ -24,6 +26,10 @@ type Props = {
   selection: Selection;
   hovered: AreaProperties | null;
   methodology: Methodology | null;
+  /** City-wide figures for the start panel (null until loaded). */
+  city: AreaMetrics | null;
+  compare: string[];
+  onToggleCompare: (areaId: string) => void;
   onSelectArea: (areaId: string) => void;
 };
 
@@ -63,22 +69,15 @@ function AreaSection(props: Props & { area: AreaMetrics }) {
         </p>
       ) : null}
       <p className="muted">{int(area.pop_total)} residents (2020 Census)</p>
-      <ul className="shares" aria-label="Share of residents by walk time">
-        {area.thresholds.map((t) => (
-          <li key={t.threshold_min} className={t.threshold_min === threshold ? "current" : ""}>
-            <span className="label">Within a {t.threshold_min}-min walk</span>
-            <span className="bar" aria-hidden="true">
-              <span
-                style={{
-                  width: `${t.pct_within * 100}%`,
-                  background: SHARE_COLORS[shareClassIndex(t.pct_within)],
-                }}
-              />
-            </span>
-            <span className="value">{pct(t.pct_within)}</span>
-          </li>
-        ))}
-      </ul>
+      <WalkVsStraightBars
+        caption="Solid: by walking route. Faint: as the crow flies. The gap is what barriers cost."
+        rows={area.thresholds.map((t) => ({
+          label: `Within a ${t.threshold_min}-min walk`,
+          walking: t.pct_within,
+          straight: t.pct_within_straight ?? null,
+          current: t.threshold_min === threshold,
+        }))}
+      />
       <dl>
         <dt>Farther than a {u}-minute walk</dt>
         <dd>
@@ -92,6 +91,8 @@ function AreaSection(props: Props & { area: AreaMetrics }) {
         <dt>Park area within a {u}-minute walk</dt>
         <dd>{area.reachable_park_ha_median.toFixed(1)} ha for the typical resident</dd>
       </dl>
+      <ContextList values={area.context} labels={indicatorLabels(props.methodology)} />
+      <CompareButton {...props} areaId={area.area_id} />
       {!area.ranked && area.area_type !== "city" ? (
         <p className="note">
           Fewer than {floor !== null ? int(floor) : "the minimum"} residents: shown on the map but
@@ -116,6 +117,32 @@ function AreaSection(props: Props & { area: AreaMetrics }) {
       ) : null}
     </section>
   );
+}
+
+function CompareButton(props: Props & { areaId: string }) {
+  const picked = props.compare.includes(props.areaId);
+  const full = !picked && props.compare.length >= MAX_COMPARE;
+  return (
+    <p>
+      <button
+        type="button"
+        className="chip"
+        aria-pressed={picked}
+        disabled={full}
+        onClick={() => props.onToggleCompare(props.areaId)}
+      >
+        {picked ? "✓ In compare" : "+ Add to compare"}
+      </button>
+      {full ? <span className="note"> Compare holds {MAX_COMPARE} areas.</span> : null}
+    </p>
+  );
+}
+
+/** "1.6× longer than a straight line (745 m)", or nothing when there's no usable ratio. */
+export function detourText(walk: number, straight: number | undefined): string | null {
+  if (straight === undefined || straight <= 0) return null;
+  const ratio = walk / straight;
+  return `${meters(straight)} in a straight line: the walk is ${ratio.toFixed(1)}× as long`;
 }
 
 function BlockSection(props: Props & { block: BlockProperties }) {
@@ -169,6 +196,9 @@ function BlockSection(props: Props & { block: BlockProperties }) {
             )}
             .
           </p>
+          {detourText(distance, block.straight_m) ? (
+            <p className="muted">{detourText(distance, block.straight_m)}.</p>
+          ) : null}
         </>
       ) : (
         <p className="hero-text">No walking route to a park on the mapped paths.</p>
@@ -209,6 +239,24 @@ export function SidePanel(props: Props) {
       {!selection.metrics && !selection.loading && !selection.block ? (
         <section>
           <h2>Can residents walk to a park?</h2>
+          {props.city
+            ? (() => {
+                const t = props.city.thresholds.find((x) => x.threshold_min === props.threshold);
+                return t ? (
+                  <p className="hero">
+                    <span className="hero-number">{pct(t.pct_within)}</span>{" "}
+                    <span className="hero-text">
+                      of {props.region.name} residents live within a {props.threshold}-minute walk
+                      of {PARKS}
+                      {t.pct_within_straight !== null
+                        ? `, against ${pct(t.pct_within_straight)} as the crow flies`
+                        : ""}
+                      .
+                    </span>
+                  </p>
+                ) : null;
+              })()
+            : null}
           <p>
             {mode === "residents"
               ? `Colors show the share of residents who live within the selected walk of ${PARKS}. Search by name or click an area.`

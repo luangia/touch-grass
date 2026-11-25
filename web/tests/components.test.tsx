@@ -30,6 +30,7 @@ describe("url state", () => {
   it("round-trips and ignores junk", () => {
     const v = {
       mode: "blocks" as const,
+      compare: ["neighborhood:1", "city"],
       region: "testville-zz",
       areaType: "neighborhood",
       threshold: 10,
@@ -38,13 +39,21 @@ describe("url state", () => {
     expect(parseView(formatView(v))).toEqual(v);
     expect(parseView("?threshold=abc&region=&view=everything")).toEqual({
       mode: null,
+      compare: [],
       region: null,
       areaType: null,
       threshold: null,
       area: null,
     });
     expect(
-      formatView({ mode: null, region: null, areaType: null, threshold: null, area: null }),
+      formatView({
+        mode: null,
+        compare: [],
+        region: null,
+        areaType: null,
+        threshold: null,
+        area: null,
+      }),
     ).toBe("");
   });
 });
@@ -148,6 +157,9 @@ describe("SidePanel", () => {
     region: REGION,
     mode: "residents" as const,
     blockClasses: blockClasses(REGION.thresholds, REGION.underserved_minutes),
+    city: null,
+    compare: [] as string[],
+    onToggleCompare: vi.fn(),
     threshold: 10,
     hovered: null,
     methodology: METHODOLOGY,
@@ -157,12 +169,16 @@ describe("SidePanel", () => {
   it("shows shares per threshold, underserved residents and the typical walk", () => {
     render(<SidePanel {...base} selection={{ ...EMPTY, metrics: metrics() }} />);
     expect(screen.getByRole("heading", { name: "Oak Hollow" })).toBeTruthy();
-    const bars = screen.getByRole("list", { name: "Share of residents by walk time" });
+    const bars = screen.getByRole("list", { name: /Solid: by walking route/ });
     expect(
       within(bars)
         .getAllByRole("listitem")
         .map((li) => li.textContent),
-    ).toEqual(["Within a 5-min walk20%", "Within a 10-min walk62%", "Within a 15-min walk95%"]);
+    ).toEqual([
+      "Within a 5-min walk20% · 50%",
+      "Within a 10-min walk62% · 90%",
+      "Within a 15-min walk95% · 100%",
+    ]);
     expect(screen.getByText("760 residents (38%)")).toBeTruthy();
     expect(screen.getByText(/640 m \(8 min\)/)).toBeTruthy();
     expect(screen.queryByText(/left out of rankings/)).toBeNull();

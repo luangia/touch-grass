@@ -441,3 +441,12 @@ def test_load_refuses_stale_metrics(db: Conn, tmp_path: Path) -> None:
     pd.read_parquet(path).iloc[:-1].to_parquet(path, index=False)
     with pytest.raises(dbload.LoadError, match="metrics of the latest run not loadable"):
         dbload.load_region(db, cfg, paths)
+
+
+def test_every_loaded_source_carries_its_licence(db: Conn, tmp_path: Path) -> None:
+    cfg, paths = _synthetic(tmp_path)
+    dbload.load_region(db, cfg, paths)
+    rows = dict(db.execute("SELECT source_id, license_name FROM touchgrass.datasets").fetchall())
+    assert rows and all(rows.values())
+    assert rows["tiger_tabblock20"] == "Public domain (U.S. Government work)"
+    assert rows["study_boundary"] == "Test licence"

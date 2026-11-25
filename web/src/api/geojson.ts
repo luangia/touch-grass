@@ -16,6 +16,8 @@ export type AreaProperties = {
   pop_total: number | null;
   pop_within: number | null;
   pct_within: number | null;
+  /** As the crow flies, to the nearest park polygon: a floor on the walk (D-025 Q3). */
+  pct_within_straight: number | null;
   underserved_pop: number | null;
   underserved_share: number | null;
   median_walk_m: number | null;
@@ -48,6 +50,7 @@ export const AREA_PROPERTY_KEYS: (keyof AreaProperties)[] = [
   "pop_total",
   "pop_within",
   "pct_within",
+  "pct_within_straight",
   "underserved_pop",
   "underserved_share",
   "median_walk_m",

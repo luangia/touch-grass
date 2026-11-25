@@ -14,7 +14,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
 SCHEMA = "touchgrass"
-EXPECTED_SCHEMA_VERSION = 8
+EXPECTED_SCHEMA_VERSION = 9
 
 Conn = psycopg.Connection[dict[str, Any]]
 

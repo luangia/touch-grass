@@ -61,6 +61,7 @@ SELECT json_build_object(
         'properties', json_build_object(
             'area_id', a.area_id, 'area_type', a.area_type, 'name', a.name,
             'pop_total', m.pop_total, 'pop_within', t.pop_within, 'pct_within', t.pct_within,
+            'pct_within_straight', t.pct_within_straight,
             'underserved_pop', m.underserved_pop, 'underserved_share', m.underserved_share,
             'median_walk_m', m.median_walk_m, 'priority_score', m.priority_score,
             'ranked', m.ranked, 'reachable_park_ha_median', m.reachable_park_ha_median)
@@ -135,7 +136,8 @@ def load_metrics(conn: Conn, region: RegionCtx, area_ids: list[str]) -> list[Are
         raise HTTPException(404, f"unknown area(s) or no metrics: {missing}")
     shares: dict[str, list[ThresholdShare]] = {a: [] for a in area_ids}
     for r in conn.execute(
-        f"""SELECT area_id, threshold_min, threshold_m, pop_within, pct_within
+        f"""SELECT area_id, threshold_min, threshold_m, pop_within, pct_within,
+                   pop_within_straight, pct_within_straight
             FROM {SCHEMA}.area_thresholds
             WHERE region_id = %(region)s AND run_id = %(run)s AND area_id = ANY(%(ids)s)
             ORDER BY area_id, threshold_min""",
@@ -196,6 +198,7 @@ class RankMetric(StrEnum):
     pct_within = "pct_within"
     underserved_pop = "underserved_pop"
     priority_score = "priority_score"
+    barrier_gap = "barrier_gap"  # straight-line share - walking share: what barriers cost
 
 
 # Identifiers can't be SQL parameters, so each metric maps to a FIXED expression; the
@@ -204,13 +207,19 @@ _VALUE = {
     RankMetric.pct_within: "t.pct_within",
     RankMetric.underserved_pop: "m.underserved_pop",
     RankMetric.priority_score: "m.priority_score",
+    RankMetric.barrier_gap: "(t.pct_within_straight - t.pct_within)",
 }
 _DEFAULT_ORDER = {
     RankMetric.pct_within: "asc",  # lowest share first = worst served
     RankMetric.underserved_pop: "desc",
     RankMetric.priority_score: "desc",
+    RankMetric.barrier_gap: "desc",
 }
-_FLOORED = {RankMetric.pct_within, RankMetric.priority_score}  # rates: D-022 Q2
+_FLOORED = {RankMetric.pct_within, RankMetric.priority_score, RankMetric.barrier_gap}  # rates
+
+
+# Stored only at the underserved threshold; the other two exist at every threshold.
+_AT_UNDERSERVED = {RankMetric.underserved_pop, RankMetric.priority_score}
 
 
 class Order(StrEnum):
@@ -231,7 +240,7 @@ def rankings(
     """Areas ordered by an access metric. ACS context is never ranked (D-022 Q7)."""
     check_area_type(conn, region.region_id, area_type)
     t = check_threshold(region, threshold)
-    if metric is not RankMetric.pct_within and t != region.underserved_minutes:
+    if metric in _AT_UNDERSERVED and t != region.underserved_minutes:
         raise HTTPException(
             422, f"{metric.value} is defined at the {region.underserved_minutes}-minute threshold"
         )

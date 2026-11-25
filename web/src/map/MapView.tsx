@@ -48,6 +48,8 @@ export type BlockProperties = {
   reachable: boolean;
   network_m?: number;
   walk_min?: number;
+  straight_m?: number; // as the crow flies, to the nearest park polygon (D-025 Q3)
+  detour_ratio?: number;
   nearest_park_name?: string;
   parks_reachable?: number;
   reachable_park_ha?: number;

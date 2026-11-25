@@ -182,6 +182,7 @@ def run_metrics(
             "geoid20": ba["geoid20"],
             "pop20": ba["pop20"],
             "distance_m": ba["network_m"].fillna(np.inf).to_numpy(),
+            "straight_m": ba["straight_m"].to_numpy(dtype=float),
             "land_m2": land.reindex(ba["geoid20"]).to_numpy(dtype=float),
             "reach_ha": reach.set_index("geoid20")["reachable_park_ha"]
             .reindex(ba["geoid20"])
@@ -221,9 +222,30 @@ def run_metrics(
         context.insert(0, "run_id", run_id)
         context["acs_vintage"] = vintage
 
+    # Residents beyond vs within the underserved walk: who lives where (D-025 Q4-Q5).
+    sides = pd.DataFrame(
+        {
+            "side": np.where(
+                ba["network_m"].fillna(np.inf).to_numpy() > under_m, "beyond", "within"
+            ),
+            "geoid20": ba["geoid20"].to_numpy(),
+        }
+    )
+    comparison = acs_alloc.compare_sides(
+        sides,
+        blocks.set_index("geoid20")["pop20"],
+        bg_total,
+        bgs.set_index("geoid"),
+        mcfg.indicators,
+        mcfg.cv_high_max,
+        mcfg.cv_medium_max,
+    )
+    analysis = json.loads((run_dir / RUN_FILES["run"]).read_text("utf-8"))
+
     checks = metrics_checks(
         cfg, metrics, shares, ba, blocks, membership, reach, weights, bg_total, context
     )
+    checks += straight_and_side_checks(cfg, shares, analysis, comparison, int(ba["pop20"].sum()))
     inputs = {name: sha256_file(out_dir / f) for name, f in sorted(INPUT_FILES.items())}
     inputs["block_access"] = sha256_file(run_dir / RUN_FILES["block_access"])
     inputs["tiger_tabblock20"] = tiger_sha
@@ -256,6 +278,12 @@ def run_metrics(
             .to_dict(),
             "ranked_areas": int(metrics["ranked"].sum()),
             "caveats": caveats(cfg),
+            "resident_comparison": {
+                "threshold_min": mcfg.underserved_minutes,
+                "assumption": "Each block group's census estimates are spread evenly over its "
+                "2020 population; differences no larger than their margin of error are not clear.",
+                "indicators": comparison,
+            },
         },
     }
     report = build_report(cfg, metrics, shares, context, weights, run_id, record)
@@ -428,6 +456,68 @@ def metrics_checks(
     return checks
 
 
+def straight_and_side_checks(
+    cfg: RegionConfig,
+    shares: pd.DataFrame,
+    analysis: dict[str, Any],
+    comparison: list[dict[str, Any]],
+    population: int,
+) -> list[Check]:
+    """Straight-line shares (D-025 Q3) and the resident comparison (Q4-Q5)."""
+    checks: list[Check] = []
+    s = shares.dropna(subset=["pct_within_straight"])
+    below = s[s["pct_within_straight"] < s["pct_within"] - TOL]
+    checks.append(
+        _hard(
+            "metrics.straight_not_below_walk",
+            below.empty,
+            "straight-line share >= walking share (a straight line is a floor on the walk)",
+            below[["area_id", "threshold_min"]].to_dict("records")[:5],
+        )
+    )
+    # The city's straight-line shares must equal Stage 6's own summary (rounded to 4 places).
+    stage6 = analysis["summary"]["share_within_minutes"]
+    city = s[s["area_id"] == CITY_ID].set_index("threshold_min")["pct_within_straight"]
+    diffs = {
+        str(t): round(abs(float(v) - stage6[str(t)]["straight_line"]), 6) for t, v in city.items()
+    }
+    checks.append(
+        _hard(
+            "metrics.city_straight_matches_analysis",
+            all(d <= 5e-5 for d in diffs.values()),
+            "city straight-line share = the analysis run's summary (±0.00005, its rounding)",
+            diffs,
+        )
+    )
+    covered = {
+        c["indicator"]: c["within"]["residents"] + c["beyond"]["residents"] for c in comparison
+    }
+    checks.append(
+        _hard(
+            "acs.sides_cover_every_resident",
+            all(v == population for v in covered.values()),
+            population,
+            covered,
+        )
+    )
+    checks.append(
+        _info(
+            "acs.resident_comparison",
+            {
+                c["indicator"]: {
+                    "within": round(c["within"]["estimate"], 4),
+                    "beyond": round(c["beyond"]["estimate"], 4),
+                    "difference": round(c["difference"], 4),
+                    "moe": round(c["difference_moe"], 4),
+                    "clear": c["clear"],
+                }
+                for c in comparison
+            },
+        )
+    )
+    return checks
+
+
 # --------------------------------------------------------------------------- report
 
 
@@ -548,6 +638,11 @@ def build_report(
     m = metrics.set_index("area_id", drop=False).rename_axis(None)
     city = m.loc[CITY_ID]
     wide = shares.pivot(index="area_id", columns="threshold_min", values="pct_within")
+    crow = (
+        shares.pivot(index="area_id", columns="threshold_min", values="pct_within_straight")
+        if "pct_within_straight" in shares.columns
+        else None
+    )
     m = m.join(wide.rename(columns=lambda t: f"pct_{t}"))
     types = sorted(set(m["area_type"]) - {CITY_TYPE})
     code = record["code"]
@@ -568,7 +663,12 @@ def build_report(
             [
                 ["Residents (2020 Census)", _int(city["pop_total"])],
                 *[
-                    [f"Within {t} min", _pct(wide.loc[CITY_ID, t])]
+                    [
+                        f"Within {t} min (walking route · straight line)",
+                        f"{_pct(wide.loc[CITY_ID, t])} · {_pct(crow.loc[CITY_ID, t])}"
+                        if crow is not None
+                        else _pct(wide.loc[CITY_ID, t]),
+                    ]
                     for t in cfg.analysis.thresholds_min
                 ],
                 [
@@ -826,6 +926,30 @@ def build_report(
                     for i, row in rel.reindex(ind_ids).fillna(0).iterrows()
                 ],
             ),
+            "",
+        ]
+
+    comp = record["summary"].get("resident_comparison")
+    if comp and comp["indicators"]:
+        t = comp["threshold_min"]
+        lines += [
+            f"**Residents farther than vs within a {t}-minute walk** (who lives where, not why)",
+            "",
+            _table(
+                ["Indicator", f"Farther than {t} min", f"Within {t} min", "Difference"],
+                [
+                    [
+                        c["label"],
+                        f"{c['beyond']['estimate']:.1%} ± {c['beyond']['moe']:.1%}",
+                        f"{c['within']['estimate']:.1%} ± {c['within']['moe']:.1%}",
+                        f"{c['difference']:+.1%} ± {c['difference_moe']:.1%}"
+                        + ("" if c["clear"] else " (no clear difference)"),
+                    ]
+                    for c in comp["indicators"]
+                ],
+            ),
+            "",
+            comp["assumption"],
             "",
         ]
 

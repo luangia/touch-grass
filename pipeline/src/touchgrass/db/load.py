@@ -132,7 +132,15 @@ def _insert(cur: Cursor, sql: str, region_id: str, expected: int, table: str, **
 # ------------------------------------------------------------------- per-table loaders
 
 
-def _load_datasets(cur: Cursor, region_id: str, manifests: list[Manifest]) -> int:
+def _load_datasets(
+    cur: Cursor,
+    region_id: str,
+    manifests: list[Manifest],
+    licences: dict[str, tuple[str, str | None]],
+) -> int:
+    missing = sorted(m.source_id for m in manifests if m.source_id not in licences)
+    if missing:  # D-025 Q8: every source states its terms
+        raise LoadError(f"no licence for source(s) {missing}; add `license` in the region config")
     _copy_stage(
         cur,
         "stage_datasets",
@@ -145,6 +153,8 @@ def _load_datasets(cur: Cursor, region_id: str, manifests: list[Manifest]) -> in
             ("retrieved_at", "text"),
             ("vintage", "text"),
             ("attribution", "text"),
+            ("license_name", "text"),
+            ("license_url", "text"),
             ("params", "text"),
         ],
         (
@@ -157,6 +167,8 @@ def _load_datasets(cur: Cursor, region_id: str, manifests: list[Manifest]) -> in
                 m.retrieved_at,
                 m.vintage,
                 m.attribution,
+                licences[m.source_id][0],
+                licences[m.source_id][1],
                 _json(m.params),
             )
             for m in manifests
@@ -166,9 +178,10 @@ def _load_datasets(cur: Cursor, region_id: str, manifests: list[Manifest]) -> in
         cur,
         f"""INSERT INTO {SCHEMA}.datasets
               (region_id, source_id, url, stored_file, stored_bytes, sha256, retrieved_at,
-               vintage, attribution, params)
+               vintage, attribution, license_name, license_url, params)
             SELECT %(region)s, source_id, url, stored_file, stored_bytes, sha256,
-                   retrieved_at::timestamptz, vintage, attribution, params::jsonb
+                   retrieved_at::timestamptz, vintage, attribution, license_name, license_url,
+                   params::jsonb
             FROM stage_datasets""",
         region_id,
         len(manifests),
@@ -728,6 +741,8 @@ def _load_area_thresholds(cur: Cursor, region_id: str, run_dirs: list[Path]) -> 
             ("threshold_m", "float8"),
             ("pop_within", "int4"),
             ("pct_within", "float8"),
+            ("pop_within_straight", "int4"),
+            ("pct_within_straight", "float8"),
         ],
         zip(
             _text(at["run_id"]),
@@ -736,15 +751,19 @@ def _load_area_thresholds(cur: Cursor, region_id: str, run_dirs: list[Path]) -> 
             _float(at["threshold_m"]),
             _int(at["pop_within"]),
             _float(at["pct_within"]),
+            # Metrics computed before migration 0009 have no straight-line shares: NULL.
+            _int(at.get("pop_within_straight", pd.Series([None] * len(at)))),
+            _float(at.get("pct_within_straight", pd.Series([None] * len(at)))),
             strict=True,
         ),
     )
     return _insert(
         cur,
         f"""INSERT INTO {SCHEMA}.area_thresholds
-              (region_id, run_id, area_id, threshold_min, threshold_m, pop_within, pct_within)
+              (region_id, run_id, area_id, threshold_min, threshold_m, pop_within, pct_within,
+               pop_within_straight, pct_within_straight)
             SELECT %(region)s, run_id, area_id, threshold_min, threshold_m, pop_within,
-                   pct_within
+                   pct_within, pop_within_straight, pct_within_straight
             FROM stage_area_thresholds""",
         region_id,
         len(at),
@@ -897,7 +916,10 @@ def load_region(
             " VALUES (%s, %s, %s, %s::jsonb)",
             (region, cfg.name, cfg.analysis_crs, cfg.model_dump_json()),
         )
-        step("datasets", lambda: _load_datasets(cur, region, manifests))
+        licences = {
+            s.source_id: (s.license_name, s.license_url) for s in src.all_sources(cfg, paths)
+        }
+        step("datasets", lambda: _load_datasets(cur, region, manifests, licences))
         step(
             "study_boundaries", lambda: _load_study_boundary(cur, region, frames["study_boundary"])
         )
