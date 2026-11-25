@@ -44,7 +44,7 @@ export function makeBlades(width: number, height: number, seed = 7): Blade[] {
   for (let x = 2; x < width - 2; x += spacing * (0.6 + rand() * 0.8)) {
     blades.push({
       x,
-      h: height * (0.35 + rand() * 0.6),
+      h: height * (0.55 + rand() * 0.42), // no short tufts: every blade is visible
       w: 3 + rand() * 3,
       shade: Math.floor(rand() * 3),
       phase: rand() * Math.PI * 2,

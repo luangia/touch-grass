@@ -657,3 +657,23 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
   - no console errors and no sideways scrolling, in both themes and at phone width.
 
 **Not verified:** a real touchscreen (the phone check used mouse events), and on the live site (needs a push).
+
+### 2026-11-25: Grass toy on phones
+
+**Problem (reported):** in Chrome on a phone, only the tips of some blades showed. The loading screen used `100vh`, which mobile browsers measure with the toolbar hidden, and the grass was pinned to the bottom, so its base fell under the toolbar.
+
+**Changed:**
+- **Layout:** the loading screen uses `100dvh` (`100vh` as a fallback). At ≤760 px the grass sits under the loading text instead of at the bottom. The caption pads for `safe-area-inset-bottom`.
+- **Grass:** the strip height comes from CSS (140 px on phones, 120 px otherwise). The shortest blade is now 55% of the strip (was 35%). The dark-theme blades are brighter.
+
+**Checked:** web tests and the 9 e2e smoke tests pass. At 375×812 in Chromium with an unreachable API, the strip sat at 225–365 px on an 812 px screen, and a drag counted 19 touches.
+
+**Not verified:** Chrome on a real phone, where the toolbar behaviour can't be emulated.
+
+### 2026-11-25: What the site is, on the loading screen
+
+**Changed:** the loading screen now opens with the TouchGrass name and "A map that measures how accessible parks are on foot." The wake notice is shorter.
+- **No city named:** "Starting with Portland, Oregon" was dropped (user's choice), because the guard test enforces D-004: region names come from the API, which is still asleep on this screen.
+- **Screen readers:** the description sits outside the announced status, so they don't read it again with each update.
+
+**Checked:** 62 web tests (the slow-load test now checks the heading and description) and 9 e2e tests pass. At 375×812 the grass sits at 291–431 px, with no sideways scrolling.

@@ -308,6 +308,12 @@ export function App() {
     return (
       <main className="loading">
         <div className="loading-card">
+          <h1 className="loading-title">
+            <span className="brand-mark" aria-hidden="true" />
+            TouchGrass
+          </h1>
+          {/* No city here: region names come from the API (D-004), which may still be asleep. */}
+          <p className="loading-intro">A map that measures how accessible parks are on foot.</p>
           {ready ? (
             <button type="button" className="button-primary" onClick={() => setEntered(true)}>
               Your map is ready →
@@ -317,8 +323,8 @@ export function App() {
           )}
           {slow && !ready ? (
             <p className="wake-notice" role="status">
-              Waking the server: free hosting sleeps when idle, so the first visit can take up to a
-              minute. Meanwhile, go touch some grass.
+              Waking the server: free hosting sleeps when idle, so this can take up to a minute.
+              Meanwhile, go touch some grass.
             </p>
           ) : null}
         </div>

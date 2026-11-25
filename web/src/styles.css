@@ -553,12 +553,26 @@ dd {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh; /* the visible height: mobile browsers' 100vh hides the bottom under their toolbar */
   padding: 32px 0 0;
   color: var(--ink);
   background: var(--bg);
 }
 .loading-card {
   padding: 0 32px;
+}
+.loading-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+.loading-intro {
+  max-width: 34rem;
+  margin: 6px 0 20px;
+  color: var(--muted);
 }
 
 /* The "touch grass" toy, at the foot of the loading screen. */
@@ -578,8 +592,17 @@ dd {
 .grass-field canvas {
   display: block;
 }
+@media (max-width: 760px) {
+  /* On a phone the toolbar comes and goes at the bottom: put the grass under the text instead. */
+  .grass-toy {
+    margin-top: 24px;
+  }
+  .grass-field {
+    height: 140px;
+  }
+}
 .grass-count {
-  padding: 10px 32px 16px;
+  padding: 10px 32px calc(16px + env(safe-area-inset-bottom, 0px)); /* clear of the home bar */
   font-size: 13px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;

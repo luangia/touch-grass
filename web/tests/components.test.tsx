@@ -398,6 +398,9 @@ describe("App", () => {
       );
       const { App, WAKE_NOTICE_AFTER_MS } = await import("../src/App");
       render(<App />);
+      // What the site is, from the first moment, and outside the announced status.
+      expect(screen.getByRole("heading", { name: "TouchGrass" })).toBeTruthy();
+      expect(screen.getByText(/how accessible parks are on foot/)).toBeTruthy();
       expect(screen.queryByRole("status")).toBeNull();
       await act(async () => {
         vi.advanceTimersByTime(WAKE_NOTICE_AFTER_MS);
