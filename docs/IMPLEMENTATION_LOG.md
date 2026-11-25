@@ -640,3 +640,20 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 **Also fixed:** `e2e/screenshots.mjs` had a nameless entry left from an earlier edit, which wrote `undefined.png`. README screenshots retaken.
 
 **Not verified:** the deployed fix (needs a push), and the visitor's own browser.
+
+## 2026-11-25 — "Touch grass" toy on the loading screen (D-026 amendment 2)
+
+**Built:**
+- `web/src/components/grass.ts`: seeded field, damped-spring blades, the pointer brush, the touch counter's rules, and reduced motion.
+- `GrassToy.tsx`: the canvas, pointer and keyboard input; the loop pauses when still.
+- **Loading screen:** the grass at the foot, shown with the wake notice; a ready button if the visitor has touched it.
+
+**Tests:**
+- **Web:** 64 (+10: field determinism, brushing direction and reach, re-touch after settling, spring limits, reduced motion, stall cap, wording, both hand-off paths).
+- **In Chromium, with the API delayed 12 s:**
+  - a mouse sweep counted 415 touches at 1280 px and 114 at 390 px;
+  - Space added a gust;
+  - the ready button led to the map;
+  - no console errors and no sideways scrolling, in both themes and at phone width.
+
+**Not verified:** a real touchscreen (the phone check used mouse events), and on the live site (needs a push).

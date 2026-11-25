@@ -550,8 +550,39 @@ dd {
 }
 .fatal,
 .loading {
-  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 32px 0 0;
   color: var(--ink);
+  background: var(--bg);
+}
+.loading-card {
+  padding: 0 32px;
+}
+
+/* The "touch grass" toy, at the foot of the loading screen. */
+.grass-toy {
+  margin: auto 0 0; /* pinned to the bottom of the screen */
+}
+.grass-field {
+  height: 120px;
+  cursor: crosshair;
+  touch-action: pan-y; /* sideways swipes brush the grass; vertical ones still scroll */
+  border-bottom: 1px solid var(--line);
+}
+.grass-field:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.grass-field canvas {
+  display: block;
+}
+.grass-count {
+  padding: 10px 32px 16px;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .wake-notice {

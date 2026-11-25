@@ -18,6 +18,7 @@ import {
 } from "./api/client";
 import { type AreaCollection, type AreaProperties, bboxOf } from "./api/geojson";
 import { AboutPage } from "./components/AboutPage";
+import { GrassToy } from "./components/GrassToy";
 import { ComparePage } from "./components/ComparePage";
 import { RankingsPage } from "./components/RankingsPage";
 import { AreaTypeToggle, ModeToggle, SearchBox, ThresholdToggle } from "./components/Controls";
@@ -93,6 +94,9 @@ export function App() {
   const [mapError, setMapError] = useState<string | null>(null);
   // Still no region after a few seconds: probably a sleeping host waking up.
   const [slow, setSlow] = useState(false);
+  // Someone brushing the grass toy when the data arrives gets a button, not a sudden switch.
+  const [grassTouched, setGrassTouched] = useState(0);
+  const [entered, setEntered] = useState(false);
   useEffect(() => {
     const t = window.setTimeout(() => setSlow(true), WAKE_NOTICE_AFTER_MS);
     return () => window.clearTimeout(t);
@@ -299,20 +303,29 @@ export function App() {
       </main>
     );
   }
-  if (!region || !areaType || threshold === null) {
+  const ready = Boolean(region && areaType && threshold !== null);
+  if (!region || !areaType || threshold === null || (grassTouched > 0 && !entered)) {
     return (
       <main className="loading">
-        <p>Loading…</p>
-        {slow ? (
-          <p className="wake-notice" role="status">
-            Waking the server: free hosting sleeps when idle, so the first visit can take up to a
-            minute.
-          </p>
-        ) : null}
+        <div className="loading-card">
+          {ready ? (
+            <button type="button" className="button-primary" onClick={() => setEntered(true)}>
+              Your map is ready →
+            </button>
+          ) : (
+            <p>Loading…</p>
+          )}
+          {slow && !ready ? (
+            <p className="wake-notice" role="status">
+              Waking the server: free hosting sleeps when idle, so the first visit can take up to a
+              minute. Meanwhile, go touch some grass.
+            </p>
+          ) : null}
+        </div>
+        {slow ? <GrassToy onTouch={setGrassTouched} /> : null}
       </main>
     );
   }
-
   const header = (
     <header className="topbar">
       <a
