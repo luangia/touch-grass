@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/luangia/touch-grass/actions/workflows/ci.yml/badge.svg)](https://github.com/luangia/touch-grass/actions/workflows/ci.yml)
 
-**Live:** [luangia.github.io/touch-grass](https://luangia.github.io/touch-grass/), once deployed ([DEPLOYMENT.md](docs/DEPLOYMENT.md)). Free hosting: the first visit after a quiet spell can take up to a minute while the server wakes.
+**Live:** [luangia.github.io/touch-grass](https://luangia.github.io/touch-grass/). Free hosting: the first visit after a quiet spell can take up to a minute while the server wakes.
 
 ![The residents view: share of each neighborhood's residents within a 10-minute walk of a park](docs/screenshots/map-residents-light.png)
 

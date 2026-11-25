@@ -14,7 +14,20 @@ test.beforeEach(async ({ page }) => {
   errors.length = 0;
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => {
-    if (m.type() === "error") errors.push(m.text());
+    // Failed requests are checked below, with their URL and type.
+    if (
+      m.type() === "error" &&
+      !m.text().startsWith("Failed to load resource")
+    ) {
+      errors.push(m.text());
+    }
+  });
+  page.on("response", (r) => {
+    // GitHub Pages serves a deep link from 404.html with status 404: that page *is* the app
+    // (D-026 Q3). Any other failed request (data, scripts, tiles) is an error.
+    if (r.status() >= 400 && r.request().resourceType() !== "document") {
+      errors.push(`${r.status()} ${r.url()}`);
+    }
   });
   if (!LIVE) {
     await page.route("https://tiles.openfreemap.org/**", (route) =>

@@ -1,6 +1,6 @@
 # Stage 11: Testing Hardening, Deployment and Portfolio
 
-> Status: **implemented 2026-11-24 (D-026); deployment waits on your account steps (§11).** §13 is what was built, §14 the results, §16 departures from the plan.
+> Status: **complete: implemented 2026-11-24, deployed 2026-11-25 (D-026).** §13 is what was built, §14 the results, §16 departures from the plan.
 > Hosting facts were checked on 2026-11-24 (sources in §15). Free tiers change often, so §12 Q1 asks for a final check on the providers' own pricing pages before any account is created.
 
 ## 1. Objective and expected outcome
@@ -324,7 +324,17 @@ The only README step not run literally was `docker compose up -d db`: the dev co
 
 **Container:** built locally and run against the dev database as uid 10001 (`/health` ok, schema 9; `/api/v1/regions` 200).
 
-**Not yet verified, because it needs your accounts (§11):** CI on GitHub's runners (the workflows are written and the jobs' commands pass locally, but GitHub hasn't run them yet); the Neon, Render and Pages deployment; the smoke tests against the public URL.
+**On GitHub and live (2026-11-25):**
+- **CI:** all five jobs green on the first push (1 min 25 s).
+- **Deployed:** web on Pages, API on Render free, database on Neon free. The API reports schema 9 with the database reachable, and only allows requests from `https://luangia.github.io`.
+- **Live smoke tests:** 8 of 8 pass against `https://luangia.github.io/touch-grass/`.
+
+**Found while deploying:**
+- **Render couldn't find the Dockerfile.** The service was created as a plain web service, which never reads `render.yaml`; setting the Root Directory to `api` fixed it.
+- **Pages was skipped.** `VITE_API_URL` was set on the `github-pages` *environment*, but the build job checks for a *repository* variable.
+- **The live smoke tests failed on deep links.** Pages serves them from `404.html` with status 404, which the browser logs as a console error. The app was fine. The test now allows a 404 only for the page document; any other failed request still fails it.
+
+**Not verified:** the cold-start wake notice on the real host (the API was awake for every check).
 
 ## 15. Answers to §12
 All eight as recommended (D-026).

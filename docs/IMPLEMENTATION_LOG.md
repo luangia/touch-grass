@@ -598,3 +598,14 @@ The project owner accepted D-016 (cite TPL's published Portland figures; don't i
 **Tests:** pipeline 253, API 42, web 52, browser 8. Linters clean; no known vulnerabilities reported.
 
 **Not verified:** CI on GitHub; the deployment (needs your accounts); the live smoke test. Nothing committed.
+
+## 2026-11-25 — Deployed
+
+- Stage 11 committed as `fe0cf72` and pushed. **CI:** all five jobs green on GitHub.
+- **Deployed:** Neon, Render and Pages. `/health` ok, schema 9; CORS allows only the Pages origin.
+- **Live smoke tests:** 8/8 pass against https://luangia.github.io/touch-grass/.
+- **Fixed during deployment:**
+  - Render's Root Directory set to `api`.
+  - `VITE_API_URL` moved to a repository variable.
+  - The smoke test now allows the 404 status of Pages' deep-link fallback page, and only that request.
+- **Not verified:** the wake notice on a sleeping host.

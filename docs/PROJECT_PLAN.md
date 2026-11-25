@@ -1,6 +1,6 @@
 # Project Plan — TouchGrass
 
-> Status: **Stages 1–10 complete. Stage 11 implemented (2026-11-24), awaiting your review; deployment waits on your account steps** ([lesson](learning/stage-11-hardening-deployment.md) §13–16, [DEPLOYMENT.md](DEPLOYMENT.md)).
+> Status: **All 11 stages complete (Stage 11 deployed 2026-11-25): live at https://luangia.github.io/touch-grass/** ([lesson](learning/stage-11-hardening-deployment.md) §13–16, [DEPLOYMENT.md](DEPLOYMENT.md)).
 > See [ARCHITECTURE.md](ARCHITECTURE.md) for design and [DECISIONS.md](DECISIONS.md) for the trade-offs behind it.
 
 ## 1. Problem
@@ -43,7 +43,7 @@ City parks are good for health, but "how many parks a city has" says little abou
 | 8 | FastAPI backend | Medium | Medium | 1 day |
 | 9 | Interactive map frontend | Medium–High | Medium | 1.5 days |
 | 10 | Comparison, underserved view, methodology & polish ✅ complete (2026-11-24) | Medium | Low–Med | 1 day |
-| 11 | Testing hardening, deployment & portfolio (optional) | Medium | Medium | 0.5–1 day |
+| 11 | Testing hardening, deployment & portfolio ✅ complete (2026-11-25) | Medium | Medium | 0.5–1 day |
 
 Total ≈ 10–12 working days — at the top of the 1–2 week target. Stages 1–7 (the analysis) are the priority; a CLI + notebook demo after Stage 7 is already a meaningful result.
 
